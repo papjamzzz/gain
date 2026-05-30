@@ -817,7 +817,7 @@ body{
 .section-hd{font-size:9px;font-weight:800;letter-spacing:.22em;color:var(--chrome2);text-transform:uppercase;margin-bottom:6px;}
 .meters-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;}
 .meter-row{display:flex;align-items:center;gap:5px;}
-.meter-lbl{font-size:9px;color:var(--text);font-weight:700;letter-spacing:.04em;text-transform:uppercase;width:60px;flex-shrink:0;}
+.meter-lbl{font-size:9px;color:var(--text);font-weight:700;letter-spacing:.04em;text-transform:uppercase;width:84px;flex-shrink:0;}
 .meter-track{flex:1;height:4px;background:#030506;border-radius:2px;overflow:hidden;border:1px solid var(--border);}
 .meter-fill{height:100%;background:linear-gradient(90deg,#005850 0%,var(--accent) 65%,var(--accent2) 100%);transition:width .12s ease;border-radius:1px;box-shadow:0 0 6px rgba(0,200,192,.3);}
 .meter-val{font-size:10px;font-weight:700;color:var(--accent2);font-variant-numeric:tabular-nums;width:28px;text-align:right;flex-shrink:0;text-shadow:0 0 6px rgba(0,200,192,.4);}
@@ -1081,7 +1081,7 @@ body{
       <div class="ch-hdr-row"><span class="ch-id">Track 1 — MODE</span><button class="ch-pwr" id="cpwr-t1" onclick="toggleTrack('t1')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
-        <div class="fader-lbl">INTENSITY</div>
+        <div class="fader-lbl">EFFORT</div>
         <div class="fader-rail">
           <!-- tick marks -->
           <div class="fader-ticks" id="ticks-intensity"></div>
@@ -1094,7 +1094,7 @@ body{
       </div>
 
       <div class="knob-wrap">
-        <div class="knob-lbl">DEPTH</div>
+        <div class="knob-lbl">THINKING TIME</div>
         <div class="knob" id="knob-depth">
           <div class="knob-body"></div>
           <div class="knob-dot" id="kd-depth"></div>
@@ -1115,7 +1115,7 @@ body{
       <div class="ch-hdr-row"><span class="ch-id">Track 2 — CONF</span><button class="ch-pwr" id="cpwr-t2" onclick="toggleTrack('t2')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
-        <div class="fader-lbl">CERTAINTY</div>
+        <div class="fader-lbl">CONFIDENCE</div>
         <div class="fader-rail">
           <div class="fader-ticks" id="ticks-certainty"></div>
           <div class="fader-track" id="ft-certainty">
@@ -1127,7 +1127,7 @@ body{
       </div>
 
       <div class="knob-wrap">
-        <div class="knob-lbl">RISK</div>
+        <div class="knob-lbl">BOLDNESS</div>
         <div class="knob" id="knob-risk">
           <div class="knob-body"></div>
           <div class="knob-dot" id="kd-risk"></div>
@@ -1151,14 +1151,14 @@ body{
     <div class="meters-wrap">
       <div class="section-hd">PARAMETER LEVELS</div>
       <div class="meters-grid">
-        <div class="meter-row"><span class="meter-lbl">INTENSITY</span><div class="meter-track"><div class="meter-fill" id="m-intensity" style="width:50%"></div></div><span class="meter-val" id="mv-intensity">0.50</span><span class="meter-lvl lvl-med" id="ml-intensity">MED</span></div>
-        <div class="meter-row"><span class="meter-lbl">CERTAINTY</span><div class="meter-track"><div class="meter-fill" id="m-certainty" style="width:50%"></div></div><span class="meter-val" id="mv-certainty">0.50</span><span class="meter-lvl lvl-med" id="ml-certainty">MED</span></div>
-        <div class="meter-row"><span class="meter-lbl">DEPTH</span><div class="meter-track"><div class="meter-fill" id="m-depth" style="width:50%"></div></div><span class="meter-val" id="mv-depth">0.50</span><span class="meter-lvl lvl-med" id="ml-depth">MED</span></div>
-        <div class="meter-row"><span class="meter-lbl">RISK</span><div class="meter-track"><div class="meter-fill" id="m-risk" style="width:50%"></div></div><span class="meter-val" id="mv-risk">0.50</span><span class="meter-lvl lvl-med" id="ml-risk">MED</span></div>
-        <div class="meter-row"><span class="meter-lbl">SCOPE</span><div class="meter-track"><div class="meter-fill" id="m-scope" style="width:50%"></div></div><span class="meter-val" id="mv-scope">0.50</span><span class="meter-lvl lvl-med" id="ml-scope">MED</span></div>
-        <div class="meter-row"><span class="meter-lbl">ROOM</span><div class="meter-track"><div class="meter-fill" id="m-room" style="width:30%"></div></div><span class="meter-val" id="mv-room">0.30</span><span class="meter-lvl lvl-low" id="ml-room">LOW</span></div>
-        <div class="meter-row"><span class="meter-lbl">BANDWIDTH</span><div class="meter-track"><div class="meter-fill" id="m-bandwidth" style="width:50%"></div></div><span class="meter-val" id="mv-bandwidth">0.50</span><span class="meter-lvl lvl-med" id="ml-bandwidth">MED</span></div>
-        <div class="meter-row"><span class="meter-lbl">DECAY</span><div class="meter-track"><div class="meter-fill" id="m-decay" style="width:30%"></div></div><span class="meter-val" id="mv-decay">0.30</span><span class="meter-lvl lvl-low" id="ml-decay">LOW</span></div>
+        <div class="meter-row"><span class="meter-lbl">EFFORT</span><div class="meter-track"><div class="meter-fill" id="m-intensity" style="width:50%"></div></div><span class="meter-val" id="mv-intensity">0.50</span><span class="meter-lvl lvl-med" id="ml-intensity">MED</span></div>
+        <div class="meter-row"><span class="meter-lbl">CONFIDENCE</span><div class="meter-track"><div class="meter-fill" id="m-certainty" style="width:50%"></div></div><span class="meter-val" id="mv-certainty">0.50</span><span class="meter-lvl lvl-med" id="ml-certainty">MED</span></div>
+        <div class="meter-row"><span class="meter-lbl">THINK TIME</span><div class="meter-track"><div class="meter-fill" id="m-depth" style="width:50%"></div></div><span class="meter-val" id="mv-depth">0.50</span><span class="meter-lvl lvl-med" id="ml-depth">MED</span></div>
+        <div class="meter-row"><span class="meter-lbl">BOLDNESS</span><div class="meter-track"><div class="meter-fill" id="m-risk" style="width:50%"></div></div><span class="meter-val" id="mv-risk">0.50</span><span class="meter-lvl lvl-med" id="ml-risk">MED</span></div>
+        <div class="meter-row"><span class="meter-lbl">ZOOM LEVEL</span><div class="meter-track"><div class="meter-fill" id="m-scope" style="width:50%"></div></div><span class="meter-val" id="mv-scope">0.50</span><span class="meter-lvl lvl-med" id="ml-scope">MED</span></div>
+        <div class="meter-row"><span class="meter-lbl">VERBOSITY</span><div class="meter-track"><div class="meter-fill" id="m-room" style="width:30%"></div></div><span class="meter-val" id="mv-room">0.30</span><span class="meter-lvl lvl-low" id="ml-room">LOW</span></div>
+        <div class="meter-row"><span class="meter-lbl">CONTEXT SIZE</span><div class="meter-track"><div class="meter-fill" id="m-bandwidth" style="width:50%"></div></div><span class="meter-val" id="mv-bandwidth">0.50</span><span class="meter-lvl lvl-med" id="ml-bandwidth">MED</span></div>
+        <div class="meter-row"><span class="meter-lbl">MEMORY</span><div class="meter-track"><div class="meter-fill" id="m-decay" style="width:30%"></div></div><span class="meter-val" id="mv-decay">0.30</span><span class="meter-lvl lvl-low" id="ml-decay">LOW</span></div>
       </div>
     </div>
 
@@ -1228,7 +1228,7 @@ body{
       <div class="ch-hdr-row"><span class="ch-id">Track 3 — SCOPE</span><button class="ch-pwr" id="cpwr-t3" onclick="toggleTrack('t3')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
-        <div class="fader-lbl">SCOPE</div>
+        <div class="fader-lbl">ZOOM LEVEL</div>
         <div class="fader-rail">
           <div class="fader-ticks" id="ticks-scope"></div>
           <div class="fader-track" id="ft-scope">
@@ -1240,7 +1240,7 @@ body{
       </div>
 
       <div class="knob-wrap">
-        <div class="knob-lbl">BANDW</div>
+        <div class="knob-lbl">CONTEXT SIZE</div>
         <div class="knob" id="knob-bandwidth">
           <div class="knob-body"></div>
           <div class="knob-dot" id="kd-bandwidth"></div>
@@ -1261,7 +1261,7 @@ body{
       <div class="ch-hdr-row"><span class="ch-id">Track 4 — VOICE</span><button class="ch-pwr" id="cpwr-t4" onclick="toggleTrack('t4')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
-        <div class="fader-lbl">ROOM</div>
+        <div class="fader-lbl">VERBOSITY</div>
         <div class="fader-rail">
           <div class="fader-ticks" id="ticks-room"></div>
           <div class="fader-track" id="ft-room">
@@ -1273,7 +1273,7 @@ body{
       </div>
 
       <div class="knob-wrap">
-        <div class="knob-lbl">DECAY</div>
+        <div class="knob-lbl">MEMORY PERSISTENCE</div>
         <div class="knob" id="knob-decay">
           <div class="knob-body"></div>
           <div class="knob-dot" id="kd-decay"></div>
@@ -1472,14 +1472,14 @@ const activeTimers = {};
 const prevVals  = {};  // tracks last seen value per field to detect real changes
 
 const INFO = {
-  intensity:  ['INTENSITY',  'How hard Claude pushes. HIGH = minimal output, direct execution. LOW = verbose reasoning, exploratory tone.'],
-  depth:      ['DEPTH',      'How deep Claude diagnoses. HIGH = full root cause analysis. LOW = surface-level reasoning only.'],
-  certainty:  ['CERTAINTY',  'Commitment to one answer. HIGH = single solution, no alternatives. LOW = 2-3 approaches with pros/cons.'],
-  risk:       ['RISK',       'How bold the changes. HIGH = best solution even if significant refactor. LOW = stay close to existing patterns.'],
-  scope:      ['SCOPE',      'How wide Claude looks. HIGH = full codebase. MED = module + dependencies. LOW = this file only.'],
-  bandwidth:  ['BANDWIDTH',  'Adjacent context. HIGH = pull in everything related. LOW = surgical, touch nothing adjacent.'],
-  room:       ['ROOM',       'Space in output. WET = thinks out loud, breathing room. DRY = close-mic\'d, just the result.'],
-  decay:      ['DECAY',      'Language density. LONG = ideas echo and build. SHORT = tight and compressed, every word counts.'],
+  intensity:  ['EFFORT',            'How hard Claude pushes. HIGH = minimal output, direct execution. LOW = verbose reasoning, exploratory tone.'],
+  depth:      ['THINKING TIME',     'How deep Claude diagnoses. HIGH = full root cause analysis. LOW = surface-level reasoning only.'],
+  certainty:  ['CONFIDENCE',        'Commitment to one answer. HIGH = single solution, no alternatives. LOW = 2-3 approaches with pros/cons.'],
+  risk:       ['BOLDNESS',          'How bold the changes. HIGH = best solution even if significant refactor. LOW = stay close to existing patterns.'],
+  scope:      ['ZOOM LEVEL',        'How wide Claude looks. HIGH = full codebase. MED = module + dependencies. LOW = this file only.'],
+  bandwidth:  ['CONTEXT SIZE',      'Adjacent context. HIGH = pull in everything related. LOW = surgical, touch nothing adjacent.'],
+  room:       ['VERBOSITY',         'Space in output. WET = thinks out loud, breathing room. DRY = close-mic\'d, just the result.'],
+  decay:      ['MEMORY PERSISTENCE','Language density. LONG = ideas echo and build. SHORT = tight and compressed, every word counts.'],
   EXPLORE:    ['EXPLORE',    'Analysis only. No code changes. Claude maps the problem and ends with a single decision point.'],
   FIX:        ['FIX',        'One root cause, one fix. No secondary issues touched. Scalpel, not a sledgehammer.'],
   BUILD:      ['BUILD',      'One atomic change implemented. No refactoring unless explicitly required.'],
@@ -1931,14 +1931,14 @@ function renderHistory() {
           <div class="hc-si"><div class="hc-si-lbl">STANCE</div><div class="hc-si-val">${esc(r.stance)}</div></div>
           <div class="hc-si"><div class="hc-si-lbl">FILTER</div><div class="hc-si-val">${esc(r.filter)}</div></div>
           <div class="hc-si"><div class="hc-si-lbl">VOICE</div><div class="hc-si-val">${esc(r.voice)}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">INTENSITY</div><div class="hc-si-val">${r.intensity}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">DEPTH</div><div class="hc-si-val">${r.depth}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">CERTAINTY</div><div class="hc-si-val">${r.certainty}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">RISK</div><div class="hc-si-val">${r.risk}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">SCOPE</div><div class="hc-si-val">${r.scope}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">BANDWIDTH</div><div class="hc-si-val">${r.bandwidth}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">ROOM</div><div class="hc-si-val">${r.room}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">DECAY</div><div class="hc-si-val">${r.decay}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">EFFORT</div><div class="hc-si-val">${r.intensity}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">THINK TIME</div><div class="hc-si-val">${r.depth}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">CONFIDENCE</div><div class="hc-si-val">${r.certainty}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">BOLDNESS</div><div class="hc-si-val">${r.risk}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">ZOOM LEVEL</div><div class="hc-si-val">${r.scope}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">CONTEXT SIZE</div><div class="hc-si-val">${r.bandwidth}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">VERBOSITY</div><div class="hc-si-val">${r.room}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">MEMORY</div><div class="hc-si-val">${r.decay}</div></div>
         </div>
         <div class="hc-full">${esc(r.resp)}</div>
         <div class="hc-actions"><button class="hc-copy" onclick="copyResp(${i},event)">Copy</button></div>
