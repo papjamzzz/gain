@@ -19,7 +19,8 @@ try:
 except ImportError:
     _anthropic = None
 
-STATE_FILE = Path.home() / ".streamfader" / "state.json"
+STATE_FILE   = Path.home() / ".streamfader" / "state.json"
+PRESETS_DIR  = Path.home() / ".streamfader" / "presets"
 PORT  = int(os.environ.get("PORT", 5570))
 MODEL = os.environ.get("CTRL_MODEL", "claude-sonnet-4-6")
 
@@ -93,7 +94,11 @@ def _execute_tool(name: str, inputs: dict) -> str:
                 return f"Error: not found: {p}"
             if p.stat().st_size > 500_000:
                 return f"Error: file too large (>{500_000} bytes)"
-            return p.read_text(errors="replace")
+            text = p.read_text(errors="replace")
+            limit = 6_000
+            if len(text) > limit:
+                return text[:limit] + f"\n\n[... truncated — {len(text) - limit} chars omitted. Ask for a specific section if you need more.]"
+            return text
 
         elif name == "write_file":
             p = Path(inputs["path"]).expanduser()
@@ -277,6 +282,50 @@ def exec_task():
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+
+@app.route("/presets", methods=["GET"])
+def list_presets():
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    out = []
+    for f in sorted(PRESETS_DIR.glob("*.json")):
+        try:
+            out.append({"name": f.stem, "state": json.loads(f.read_text())})
+        except Exception:
+            pass
+    return jsonify(out)
+
+@app.route("/presets/save", methods=["POST"])
+def save_preset():
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    safe = "".join(c for c in name if c.isalnum() or c in " -_").strip()[:40]
+    if not safe:
+        return jsonify({"error": "Invalid name"}), 400
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    (PRESETS_DIR / f"{safe}.json").write_text(json.dumps(read_state(), indent=2) + "\n")
+    return jsonify({"ok": True, "name": safe})
+
+@app.route("/presets/load", methods=["POST"])
+def load_preset():
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    f = PRESETS_DIR / f"{name}.json"
+    if not f.exists():
+        return jsonify({"error": "Not found"}), 404
+    state = json.loads(f.read_text())
+    write_state(state)
+    return jsonify({"ok": True, "state": state})
+
+@app.route("/presets/delete", methods=["POST"])
+def delete_preset():
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    f = PRESETS_DIR / f"{name}.json"
+    if f.exists():
+        f.unlink()
+    return jsonify({"ok": True})
 
 @app.route("/health")
 def health():
@@ -835,7 +884,7 @@ body{
 }
 .run-btn:hover{background:linear-gradient(180deg,#002420,#001A18);box-shadow:0 0 14px rgba(0,200,192,.28);}
 .run-btn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;}
-.resp-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;margin-top:6px;}
+.resp-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;margin-top:6px;position:relative;}
 .resp-wrap.open{}
 .resp-box{
   flex:1;padding:10px 12px;
@@ -847,6 +896,27 @@ body{
   letter-spacing:.01em;
 }
 .resp-box .err{color:#E05050;font-weight:600;}
+/* PRESETS */
+.presets-wrap{padding:6px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.presets-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.preset-save-row{display:flex;gap:5px;align-items:center;}
+.preset-input{height:22px;background:#030507;border:1px solid var(--border2);border-radius:2px;color:var(--text);font-size:10px;padding:0 7px;font-family:inherit;width:130px;}
+.preset-input:focus{outline:none;border-color:var(--accent);}
+.preset-save-btn{height:22px;padding:0 10px;border-radius:2px;border:1px solid var(--accent);background:rgba(0,200,192,.07);color:var(--accent);font-size:9px;font-weight:800;letter-spacing:.08em;cursor:pointer;transition:all .1s;flex-shrink:0;}
+.preset-save-btn:hover{background:rgba(0,200,192,.18);}
+.preset-list{display:flex;flex-wrap:wrap;gap:4px;min-height:16px;}
+.preset-item{display:flex;align-items:center;gap:3px;background:#0A141E;border:1px solid var(--border2);border-radius:2px;padding:2px 4px 2px 8px;transition:border-color .1s;}
+.preset-item:hover{border-color:var(--accent);}
+.preset-name{font-size:10px;font-weight:700;color:var(--text);letter-spacing:.04em;cursor:pointer;white-space:nowrap;}
+.preset-load{font-size:8px;padding:1px 5px;border-radius:2px;border:1px solid var(--border2);background:transparent;color:var(--text3);cursor:pointer;font-weight:700;letter-spacing:.06em;flex-shrink:0;}
+.preset-load:hover{border-color:var(--accent);color:var(--accent);}
+.preset-del{width:16px;height:16px;border:none;background:transparent;color:var(--text3);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;flex-shrink:0;}
+.preset-del:hover{color:#E05050;}
+.preset-empty{font-size:9px;color:var(--text3);letter-spacing:.04em;}
+.copy-btn{position:absolute;bottom:10px;right:10px;width:22px;height:22px;border-radius:2px;border:1px solid var(--border2);background:rgba(11,16,24,.85);color:var(--text3);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;line-height:1;}
+.resp-wrap:hover .copy-btn{opacity:1;}
+.copy-btn:hover{color:var(--accent);border-color:var(--accent);background:rgba(0,200,192,.08);}
+.copy-btn.copied{color:#50C878;border-color:#50C878;opacity:1;}
 
 
 /* INFO BOX */
@@ -1099,6 +1169,18 @@ body{
       <div class="pill-group"><span class="pill-lbl">VOICE</span><div class="pill" id="pill-voice">—</div></div>
     </div>
 
+    <!-- PRESETS -->
+    <div class="presets-wrap">
+      <div class="presets-hd-row">
+        <div class="section-hd">PRESETS</div>
+        <div class="preset-save-row">
+          <input class="preset-input" id="preset-input" type="text" placeholder="name this state…" maxlength="40">
+          <button class="preset-save-btn" onclick="savePreset()">SAVE</button>
+        </div>
+      </div>
+      <div class="preset-list" id="preset-list"><span class="preset-empty">no presets saved</span></div>
+    </div>
+
     <!-- CTRL RUN LAUNCHER -->
     <div class="launch-wrap">
       <input class="launch-input" id="launch-input" type="text" placeholder="type a task · Enter to run — reads and writes files, no terminal needed">
@@ -1117,6 +1199,7 @@ body{
       </div>
       <div class="resp-wrap" id="resp-wrap">
         <div class="resp-box" id="resp-box"></div>
+        <button class="copy-btn" id="copy-btn" onclick="copyResp()" title="Copy output">⎘</button>
       </div>
     </div>
 
@@ -1863,6 +1946,54 @@ function renderHistory() {
     </div>`).join('');
 }
 
+// ── PRESETS ───────────────────────────────────────────────────────
+let presets = [];
+async function loadPresets() {
+  try {
+    const r = await fetch('/presets');
+    presets = await r.json();
+    renderPresets();
+  } catch(e) {}
+}
+function renderPresets() {
+  const el = document.getElementById('preset-list');
+  if (!presets.length) { el.innerHTML = '<span class="preset-empty">no presets saved</span>'; return; }
+  el.innerHTML = presets.map(p => `<div class="preset-item">
+    <span class="preset-name" onclick="applyPreset('${esc(p.name)}')">${esc(p.name)}</span>
+    <button class="preset-load" onclick="applyPreset('${esc(p.name)}')">LOAD</button>
+    <button class="preset-del" onclick="deletePreset('${esc(p.name)}')" title="Delete">×</button>
+  </div>`).join('');
+}
+async function savePreset() {
+  const name = document.getElementById('preset-input').value.trim();
+  if (!name) return;
+  const r = await fetch('/presets/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+  const d = await r.json();
+  document.getElementById('preset-input').value = '';
+  loadPresets();
+}
+async function applyPreset(name) {
+  await fetch('/presets/load', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+  // SSE stream will push the updated state to the UI automatically
+}
+async function deletePreset(name) {
+  await fetch('/presets/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+  loadPresets();
+}
+document.getElementById('preset-input').addEventListener('keydown', e => { if (e.key === 'Enter') savePreset(); });
+loadPresets();
+
+// ── COPY ──────────────────────────────────────────────────────────
+function copyResp() {
+  const txt = document.getElementById('resp-box').textContent;
+  if (!txt) return;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.classList.add('copied'); btn.textContent = '✓';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '⎘'; }, 1500);
+  });
+}
+
 // ── PREVIEW RUN ───────────────────────────────────────────────────
 const taskInput = document.getElementById('task-input');
 const runBtn    = document.getElementById('run-btn');
@@ -1932,6 +2063,7 @@ async function launchTask() {
   if (!task || launchBtn.disabled) return;
   launchBtn.disabled = true; launchBtn.textContent = '···';
   launchRunning.classList.add('show');
+  respBox.textContent = ''; respWrap.classList.add('open'); respBox.scrollTop = 0;
   const snap = {
     mode:      lastState.mode      || '—',
     stance:    lastState.stance    || '—',
@@ -1964,6 +2096,7 @@ async function launchTask() {
         if (d.text) {
           textOutput += d.text;
           fullLog    += d.text;
+          respBox.textContent = fullLog; respBox.scrollTop = respBox.scrollHeight;
         }
         if (d.tool) {
           const icon  = TOOL_ICONS[d.tool] || '🔧';
@@ -1973,9 +2106,11 @@ async function launchTask() {
                         d.input.command || '';
           const tag = `\n[${icon} ${d.tool}: ${label}]\n`;
           fullLog += tag;
+          respBox.textContent = fullLog; respBox.scrollTop = respBox.scrollHeight;
         }
         if (d.error) {
           fullLog += `\n[error: ${d.error}]`;
+          respBox.innerHTML = '<span class="err">'+esc(d.error)+'</span>';
           finish();
         }
         if (d.done) {
