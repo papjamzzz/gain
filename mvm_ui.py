@@ -1302,15 +1302,15 @@ body{
   <div class="faq-body">
 
     <div class="faq-s">
-      <div class="faq-s-title">what is control?</div>
-      <p class="faq-p">Control is a behavioral mixing board for Claude Code. Every fader, knob, and button writes to a system prompt in real time. Same task, different state — measurably different output. You perform instead of prompt.</p>
+      <div class="faq-s-title">what is gain?</div>
+      <p class="faq-p">Gain is a behavioral mixing board for AI coding agents. Every fader, knob, and button writes to a system prompt in real time. Same task, different state — measurably different output. You perform instead of prompt.</p>
       <p class="faq-p">Four tracks. Each one controls a different dimension of how Claude thinks. All parameters flow through <code style="background:#040608;padding:1px 4px;border-radius:2px;font-size:10px">~/.streamfader/state.json</code>, which the CLI reads on every run.</p>
     </div>
 
     <div class="faq-s">
       <div class="faq-s-title">T1 — MODE</div>
       <div class="faq-track">
-        <div class="faq-track-name">Fader: Intensity &nbsp;·&nbsp; Knob: Depth</div>
+        <div class="faq-track-name">Fader: Effort &nbsp;·&nbsp; Knob: Thinking Time</div>
         <div class="faq-track-desc">Sets what Claude is allowed to do and how it reasons.</div>
         <div class="faq-track-desc" style="margin-top:6px">
           <strong style="color:var(--accent2)">EXPLORE</strong> — analysis only. No code changes. Ends with a single decision point.<br>
@@ -1318,8 +1318,8 @@ body{
           <em style="opacity:.5">Nothing selected = track off, mode rules skipped.</em>
         </div>
         <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Intensity</strong> — HIGH compresses output to direct execution. LOW opens verbose exploratory reasoning.<br>
-          <strong style="color:var(--text)">Depth</strong> — HIGH allows deep diagnostic chains. LOW keeps reasoning at the surface.
+          <strong style="color:var(--text)">Effort</strong> — HIGH compresses output to direct execution. LOW opens verbose exploratory reasoning.<br>
+          <strong style="color:var(--text)">Thinking Time</strong> — HIGH allows deep diagnostic chains. LOW keeps reasoning at the surface.
         </div>
       </div>
     </div>
@@ -1327,15 +1327,15 @@ body{
     <div class="faq-s">
       <div class="faq-s-title">T2 — CONFIDENCE</div>
       <div class="faq-track" style="border-left-color:#8B5CF6">
-        <div class="faq-track-name">Fader: Certainty &nbsp;·&nbsp; Knob: Risk</div>
+        <div class="faq-track-name">Fader: Confidence &nbsp;·&nbsp; Knob: Boldness</div>
         <div class="faq-track-desc">Controls how committed Claude is to its choices and how bold the changes are.</div>
         <div class="faq-track-desc" style="margin-top:6px">
           <strong style="color:#A78BFA">LIST</strong> — shows 2–3 alternatives with pros/cons. Does not pick.<br>
           <strong style="color:#A78BFA">DECIDE</strong> — picks one approach and implements it. Zero explanation of alternatives.
         </div>
         <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Certainty</strong> — HIGH commits to one solution, no hedging. LOW shows options.<br>
-          <strong style="color:var(--text)">Risk</strong> — HIGH pursues the best solution even if it requires large changes. LOW stays close to existing patterns.
+          <strong style="color:var(--text)">Confidence</strong> — HIGH commits to one solution, no hedging. LOW shows options.<br>
+          <strong style="color:var(--text)">Boldness</strong> — HIGH pursues the best solution even if it requires large changes. LOW stays close to existing patterns.
         </div>
       </div>
     </div>
@@ -1343,15 +1343,15 @@ body{
     <div class="faq-s">
       <div class="faq-s-title">T3 — SCOPE</div>
       <div class="faq-track" style="border-left-color:#00A8A0">
-        <div class="faq-track-name">Fader: Scope &nbsp;·&nbsp; Knob: Bandwidth</div>
+        <div class="faq-track-name">Fader: Zoom Level &nbsp;·&nbsp; Knob: Context Size</div>
         <div class="faq-track-desc">Controls how wide Claude looks when building context.</div>
         <div class="faq-track-desc" style="margin-top:6px">
           <strong style="color:var(--accent2)">FILE</strong> — strict local scope. This file only, no cross-module pulls.<br>
           <strong style="color:var(--accent2)">PROJECT</strong> — full codebase context allowed, global awareness.
         </div>
         <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Scope</strong> — how far out Claude searches for relevant code and context.<br>
-          <strong style="color:var(--text)">Bandwidth</strong> — HIGH pulls in adjacent concerns freely. LOW is surgical, touches nothing adjacent.
+          <strong style="color:var(--text)">Zoom Level</strong> — how far out Claude searches for relevant code and context.<br>
+          <strong style="color:var(--text)">Context Size</strong> — HIGH pulls in adjacent concerns freely. LOW is surgical, touches nothing adjacent.
         </div>
       </div>
     </div>
@@ -1359,15 +1359,15 @@ body{
     <div class="faq-s">
       <div class="faq-s-title">T4 — VOICE</div>
       <div class="faq-track" style="border-left-color:#6040C8">
-        <div class="faq-track-name">Fader: Room &nbsp;·&nbsp; Knob: Decay</div>
+        <div class="faq-track-name">Fader: Verbosity &nbsp;·&nbsp; Knob: Memory Persistence</div>
         <div class="faq-track-desc">Controls how output feels — the texture of Claude's responses.</div>
         <div class="faq-track-desc" style="margin-top:6px">
           <strong style="color:#A78BFA">DIRECT</strong> — dead room. Output only, zero commentary or preamble.<br>
           <strong style="color:#A78BFA">OPEN</strong> — full resonance. Thinks out loud with you, collaborative tone.
         </div>
         <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Room</strong> — WET gives breathing room and space. DRY is close-mic'd, just the output.<br>
-          <strong style="color:var(--text)">Decay</strong> — LONG lets ideas echo and build. SHORT compresses to tight, every-word-counts density.
+          <strong style="color:var(--text)">Verbosity</strong> — WET gives breathing room and space. DRY is close-mic'd, just the output.<br>
+          <strong style="color:var(--text)">Memory Persistence</strong> — LONG lets ideas echo and build. SHORT compresses to tight, every-word-counts density.
         </div>
       </div>
     </div>
@@ -1404,8 +1404,8 @@ body{
 
     <div class="faq-s">
       <div class="faq-s-title">LAUNCH vs PREVIEW RUN</div>
-      <p class="faq-p"><strong style="color:#A78BFA">LAUNCH</strong> (purple) — runs <code style="background:#040608;padding:1px 4px;border-radius:2px;font-size:10px">ctrl run</code> via terminal. Claude Code with full tool access — reads files, writes code, executes bash. This is the real thing. The state set here shapes every decision.</p>
-      <p class="faq-p"><strong style="color:var(--accent2)">PREVIEW RUN</strong> (teal) — calls the Claude API directly with the current system prompt. API only, no file access. Shows you exactly what instructions your current state produces. Good for dialing in a prompt before committing to a full run.</p>
+      <p class="faq-p"><strong style="color:#A78BFA">LAUNCH</strong> (purple) — full agentic loop. Claude reads files, writes code, runs shell commands — up to 20 tool turns. This is the real thing. Every move on the board shapes what it does and how it responds.</p>
+      <p class="faq-p"><strong style="color:var(--accent2)">PREVIEW RUN</strong> (teal) — API only, no file access. Shows you exactly what your current state produces in plain text. Good for dialing in behavior before committing to a full run.</p>
     </div>
 
     <div class="faq-s">
@@ -1415,8 +1415,8 @@ body{
       <p class="faq-p">Controller layout:</p>
       <div class="faq-track">
         <div class="faq-track-desc">
-          <strong style="color:var(--text)">Faders 1–4</strong> — Intensity, Certainty, Scope, Room<br>
-          <strong style="color:var(--text)">Knobs 1–4</strong> — Depth, Risk, Bandwidth, Decay<br>
+          <strong style="color:var(--text)">Faders 1–4</strong> — Effort, Confidence, Zoom Level, Verbosity<br>
+          <strong style="color:var(--text)">Knobs 1–4</strong> — Thinking Time, Boldness, Context Size, Memory Persistence<br>
           <strong style="color:var(--text)">S buttons</strong> (row 1) — left-extreme mode per track (EXPLORE / LIST / FILE / DIRECT)<br>
           <strong style="color:var(--text)">M buttons</strong> (row 2) — mute T1 / T2 / T3 / T4<br>
           <strong style="color:var(--text)">R buttons</strong> (row 3) — right-extreme mode per track (BUILD / DECIDE / PROJECT / OPEN)<br>
@@ -1428,18 +1428,24 @@ body{
     </div>
 
     <div class="faq-s">
+      <div class="faq-s-title">presets</div>
+      <p class="faq-p">Save any board state as a named preset. Type a name in the PRESETS bar and hit Enter or SAVE. Click a preset chip to load it instantly — the board snaps to that state in real time.</p>
+      <p class="faq-p">Presets are saved to <code style="background:#040608;padding:1px 4px;border-radius:2px;font-size:10px">~/.streamfader/presets/</code> as JSON files. They persist across restarts and sync with the CLI and MIDI bridge automatically.</p>
+    </div>
+
+    <div class="faq-s">
       <div class="faq-s-title">practical combos</div>
       <div class="faq-track">
         <div class="faq-track-name">Analyze before touching code</div>
-        <div class="faq-track-desc">T1: EXPLORE, Intensity LOW, Depth HIGH. T2: LIST. Mute T3 + T4. Ask anything. No files touched, full options shown.</div>
+        <div class="faq-track-desc">T1: EXPLORE, Effort LOW, Thinking Time HIGH. T2: LIST. Mute T3 + T4. Ask anything. No files touched, full options shown.</div>
       </div>
       <div class="faq-track">
         <div class="faq-track-name">Fast surgical fix</div>
-        <div class="faq-track-desc">T1: BUILD, Intensity HIGH. T2: DECIDE, Certainty HIGH, Risk LOW. T3: FILE. T4: DIRECT. One file, one fix, no commentary.</div>
+        <div class="faq-track-desc">T1: BUILD, Effort HIGH. T2: DECIDE, Confidence HIGH, Boldness LOW. T3: FILE. T4: DIRECT. One file, one fix, no commentary.</div>
       </div>
       <div class="faq-track">
         <div class="faq-track-name">Risky refactor</div>
-        <div class="faq-track-desc">T1: BUILD, Depth HIGH. T2: DECIDE, Risk HIGH. T3: PROJECT, Bandwidth HIGH. T4: STUDIO. Full codebase access, bold changes, clean output.</div>
+        <div class="faq-track-desc">T1: BUILD, Thinking Time HIGH. T2: DECIDE, Boldness HIGH. T3: PROJECT, Context Size HIGH. T4: STUDIO. Full codebase access, bold changes, clean output.</div>
       </div>
       <p class="faq-p" style="opacity:.3;font-style:italic;margin-top:12px">Same task. Different state. That's the machine.</p>
     </div>
