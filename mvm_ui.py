@@ -332,24 +332,29 @@ body{
   border-bottom:1px solid var(--border);
   background:#030507;
   background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 3px);
-  display:flex;align-items:center;gap:10px;
+  display:flex;align-items:center;
   flex-shrink:0;height:42px;
   box-shadow:0 1px 0 rgba(0,200,192,.1);
+  position:relative;
 }
-.logo-mark{flex-shrink:0;}
 .brand{
-  font-family:'Abril Fatface',serif;font-size:17px;letter-spacing:.06em;line-height:1;
+  font-family:'Abril Fatface',serif;font-size:26px;letter-spacing:.06em;line-height:42px;
   background:linear-gradient(130deg,#00E8FF 0%,#A0C8FF 50%,#C0A0FF 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 0 6px rgba(0,200,255,.55)) drop-shadow(0 0 14px rgba(160,100,255,.3));
+  flex-shrink:0;
 }
-.hdr-sep{width:1px;height:18px;background:var(--border);flex-shrink:0;}
+.hdr-center{
+  position:absolute;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:10px;
+  pointer-events:none;
+}
 .hdr-badge{
-  font-size:10px;font-weight:800;letter-spacing:.12em;
-  padding:2px 8px;border-radius:2px;border-left:2px solid;
+  font-size:11px;font-weight:800;letter-spacing:.14em;
+  padding:3px 10px;border-radius:2px;border-left:2px solid;
   transition:all .25s;
 }
-.hdr-vals{font-size:10px;color:var(--text2);letter-spacing:.06em;font-weight:600;font-variant-numeric:tabular-nums;}
+.hdr-vals{font-size:11px;color:#9BBDD6;letter-spacing:.06em;font-weight:600;font-variant-numeric:tabular-nums;}
 .hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .faq-btn{
   width:36px;height:36px;border-radius:50%;
@@ -920,25 +925,11 @@ body{
 
 <!-- ── HEADER ─────────────────────────────────────────────────── -->
 <div class="hdr">
-  <svg class="logo-mark" width="56" height="28" viewBox="0 0 56 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="56" height="28" rx="3" fill="#040810"/>
-    <rect x="2" y="2" width="52" height="24" rx="2" fill="#060C18"/>
-    <line x1="2" y1="10" x2="54" y2="10" stroke="#0E1C28" stroke-width="0.5"/>
-    <line x1="2" y1="14" x2="54" y2="14" stroke="#0E1C28" stroke-width="0.5"/>
-    <line x1="2" y1="18" x2="54" y2="18" stroke="#0E1C28" stroke-width="0.5"/>
-    <line x1="28" y1="2" x2="28" y2="26" stroke="#1A3848" stroke-width="0.8" stroke-dasharray="2,2"/>
-    <polyline points="3,14 5,9 7,19 9,7 11,20 13,11 15,17 17,6 19,18 21,14 28,14" stroke="#8B5CF6" stroke-width="1.3" stroke-linejoin="round" fill="none"/>
-    <path d="M28,14 C31,14 32,5 34,5 C36,5 37,23 39,23 C41,23 42,5 44,5 C46,5 47,14 53,14" stroke="#00C8C0" stroke-width="1.8" fill="none"/>
-    <circle cx="4" cy="4" r="1.2" fill="#1A2E40"/>
-    <circle cx="52" cy="4" r="1.2" fill="#1A2E40"/>
-    <circle cx="4" cy="24" r="1.2" fill="#1A2E40"/>
-    <circle cx="52" cy="24" r="1.2" fill="#1A2E40"/>
-    <rect width="56" height="28" rx="3" fill="none" stroke="#162030" stroke-width="1"/>
-  </svg>
   <span class="brand">gain</span>
-  <div class="hdr-sep"></div>
-  <div class="hdr-badge" id="hdr-badge">—</div>
-  <div class="hdr-vals" id="hdr-vals">—</div>
+  <div class="hdr-center">
+    <div class="hdr-badge" id="hdr-badge">—</div>
+    <div class="hdr-vals" id="hdr-vals">—</div>
+  </div>
   <div class="hdr-right">
     <button class="faq-btn" onclick="openFaq()">?</button>
   </div>
