@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Control — physical control layer for Claude Code."""
+"""Gain — physical control layer for Claude Code."""
 
 import sys
 import json
@@ -81,7 +81,7 @@ def print_header(state: dict) -> None:
     W = 46
     border = "─" * W
     print(f"┌{border}┐")
-    print(f"│{'Control  ·  physical control layer':^{W}}│")
+    print(f"│{'Gain  ·  physical control layer':^{W}}│")
     print(f"├{border}┤")
     print(f"│  MODE       {mode:<{W - 13}}│")
     print(f"│  INTENSITY  {_bar(intensity)}  {intensity:.2f}  {_level(intensity):<{W - 37}}│")
@@ -328,7 +328,7 @@ def cmd_ui(ui_args: list) -> None:
 
 
 def usage() -> None:
-    print("Control — physical control layer for Claude Code")
+    print("Gain — physical control layer for Claude Code")
     print()
     print("Usage:")
     print('  ctrl run "<task>"     Execute task under current state')

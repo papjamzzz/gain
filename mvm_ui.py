@@ -290,9 +290,9 @@ HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Control</title>
-<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>Gain</title>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
   --bg:        #060A0F;
@@ -305,11 +305,11 @@ HTML = r"""<!DOCTYPE html>
   --purple:    #8B5CF6;
   --purple2:   #A78BFA;
   --green:     #00C8C0;
-  --text:      #B0CCDE;
-  --text2:     #3D5870;
-  --text3:     #223040;
-  --chrome:    #4A7090;
-  --chrome2:   #7AA0BA;
+  --text:      #C8DCEA;
+  --text2:     #607A94;
+  --text3:     #3A5268;
+  --chrome:    #5A8098;
+  --chrome2:   #8ABACE;
   --fader-bg:  #040608;
   --fader-trk: #020406;
   --thumb-hi:  #A8C4D8;
@@ -352,15 +352,16 @@ body{
 .hdr-vals{font-size:10px;color:var(--text2);letter-spacing:.06em;font-weight:600;font-variant-numeric:tabular-nums;}
 .hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .faq-btn{
-  width:48px;height:48px;border-radius:50%;
-  border:2px solid var(--accent);background:rgba(0,200,192,.08);
-  color:var(--accent);font-size:22px;font-weight:800;
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid var(--accent);background:rgba(0,200,192,.07);
+  color:var(--accent);font-size:16px;font-weight:800;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .15s;line-height:1;
-  box-shadow:0 0 14px rgba(0,200,192,.35),0 0 28px rgba(0,200,192,.18);
-  text-shadow:0 0 10px rgba(0,232,224,.8);
+  box-shadow:0 0 10px rgba(0,200,192,.28),0 0 20px rgba(0,200,192,.12);
+  text-shadow:0 0 8px rgba(0,232,224,.7);
+  flex-shrink:0;
 }
-.faq-btn:hover{background:rgba(0,200,192,.18);color:var(--accent2);border-color:var(--accent2);box-shadow:0 0 20px rgba(0,200,192,.55),0 0 40px rgba(0,200,192,.28);}
+.faq-btn:hover{background:rgba(0,200,192,.16);color:var(--accent2);border-color:var(--accent2);box-shadow:0 0 16px rgba(0,200,192,.48),0 0 32px rgba(0,200,192,.22);}
 
 /* ── HERO ───────────────────────────────────────────────── */
 .hero{position:relative;flex-shrink:0;height:108px;overflow:hidden;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,200,192,.12);}
@@ -413,8 +414,8 @@ body{
   width:100%;margin-top:6px;margin-bottom:10px;flex-shrink:0;
 }
 .ch-id{
-  font-size:8px;font-weight:800;letter-spacing:.2em;
-  color:var(--text2);text-transform:uppercase;
+  font-size:8px;font-weight:800;letter-spacing:.16em;
+  color:#7A9AB8;text-transform:uppercase;
 }
 .ch-pwr{
   width:18px;height:18px;border-radius:2px;
@@ -482,7 +483,7 @@ body{
   flex:1;min-height:80px;max-height:240px;
   width:100%;gap:4px;
 }
-.fader-lbl{font-size:8px;color:var(--text2);font-weight:700;letter-spacing:.1em;text-transform:uppercase;flex-shrink:0;}
+.fader-lbl{font-size:8px;color:#7A9AB8;font-weight:700;letter-spacing:.1em;text-transform:uppercase;flex-shrink:0;}
 
 /* the rail assembly */
 .fader-rail{
@@ -664,19 +665,21 @@ body{
   padding:8px 0 6px;
   border-top:1px solid var(--border);
 }
-.knob-lbl{font-size:8px;color:var(--text2);font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
+.knob-lbl{font-size:8px;color:#7A9AB8;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
 .knob{
   width:46px;height:46px;border-radius:50%;
   position:relative;cursor:grab;touch-action:none;
   background:conic-gradient(#0A1620 0deg 225deg, #0A1620 225deg 360deg);
   box-shadow:
-    0 4px 16px rgba(0,0,0,1),
-    0 0 0 1px rgba(0,0,0,.95),
+    0 5px 18px rgba(0,0,0,1),
+    0 0 0 1px rgba(0,0,0,.98),
+    0 0 0 2px rgba(255,255,255,.04),
+    inset 0 1px 0 rgba(255,255,255,.06),
     0 0 20px rgba(0,196,232,.08),
     0 0 40px rgba(0,196,232,.04);
   transition:box-shadow .15s;
 }
-.knob:active{cursor:grabbing;box-shadow:0 4px 16px rgba(0,0,0,1),0 0 0 1px rgba(0,0,0,.95),0 0 28px rgba(0,196,232,.28),0 0 52px rgba(0,196,232,.10);}
+.knob:active{cursor:grabbing;box-shadow:0 5px 18px rgba(0,0,0,1),0 0 0 1px rgba(0,0,0,.98),0 0 0 2px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.06),0 0 28px rgba(0,196,232,.28),0 0 52px rgba(0,196,232,.10);}
 @keyframes detent-flash{
   0%  {filter:brightness(1);}
   35% {filter:brightness(2.5) drop-shadow(0 0 6px rgba(0,240,255,.9));}
@@ -686,12 +689,15 @@ body{
 /* matte inner body — hardware console knob */
 .knob-body{
   position:absolute;inset:5px;border-radius:50%;
-  background:radial-gradient(circle at 34% 28%,#223448 0%,#0C1C2A 42%,#050A12 100%);
+  background:radial-gradient(circle at 36% 30%,#2C3E54 0%,#16263A 28%,#0A1828 58%,#050E1A 100%);
   border:1px solid rgba(0,0,0,.98);
   box-shadow:
-    inset 0 2px 4px rgba(255,255,255,.06),
-    inset 0 -2px 5px rgba(0,0,0,.92),
-    inset 0 0 14px rgba(0,200,192,.04);
+    inset 0 3px 7px rgba(255,255,255,.13),
+    inset 0 -3px 9px rgba(0,0,0,.96),
+    inset 1px 0 4px rgba(255,255,255,.05),
+    inset -1px 0 4px rgba(0,0,0,.7),
+    inset 0 0 18px rgba(0,0,0,.55),
+    0 0 0 1px rgba(255,255,255,.05);
 }
 /* indicator pointer */
 .knob-dot{
@@ -771,11 +777,11 @@ body{
 .pill{padding:2px 8px;border-radius:2px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;transition:all .2s;}
 
 /* PREVIEW RUN */
-.preview-wrap{padding:8px 14px 7px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.preview-top{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.preview-wrap{padding:8px 14px 7px;border-bottom:1px solid var(--border);flex:1;display:flex;flex-direction:column;min-height:0;}
+.preview-top{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-shrink:0;}
 .preview-hd{font-size:8px;font-weight:800;letter-spacing:.2em;color:var(--text3);text-transform:uppercase;}
 .api-tag{font-size:8px;font-weight:700;padding:2px 6px;border-radius:2px;background:rgba(0,200,192,.08);color:#00A8A0;letter-spacing:.04em;border:1px solid rgba(0,200,192,.2);}
-.task-row{display:flex;gap:6px;align-items:center;}
+.task-row{display:flex;gap:6px;align-items:center;flex-shrink:0;}
 .launch-wrap{
   padding:10px 14px 8px;border-bottom:1px solid var(--border);
   display:flex;gap:7px;align-items:center;flex-shrink:0;
@@ -824,23 +830,19 @@ body{
 }
 .run-btn:hover{background:linear-gradient(180deg,#002420,#001A18);box-shadow:0 0 14px rgba(0,200,192,.28);}
 .run-btn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;}
-.resp-wrap{overflow:hidden;max-height:0;transition:max-height .25s ease;}
-.resp-wrap.open{max-height:110px;}
+.resp-wrap{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;margin-top:6px;}
+.resp-wrap.open{}
 .resp-box{
-  margin-top:5px;padding:8px 10px;
-  background:#040608;border:1px solid var(--border);border-radius:3px;
-  font-size:11px;line-height:1.6;color:var(--text);
-  white-space:pre-wrap;max-height:100px;overflow-y:auto;
-  font-family:'Inter',sans-serif;
+  flex:1;padding:10px 12px;
+  background:#030507;border:1px solid var(--border);border-radius:3px;
+  font-size:12px;line-height:1.7;color:var(--text);
+  white-space:pre-wrap;overflow-y:auto;
+  font-family:'JetBrains Mono','Fira Code','Cascadia Code','SF Mono','Menlo',monospace;
+  -webkit-overflow-scrolling:touch;
+  letter-spacing:.01em;
 }
 .resp-box .err{color:#E05050;font-weight:600;}
 
-/* LIVE PROMPT PREVIEW */
-.prompt-preview-wrap{flex:1;display:flex;flex-direction:column;min-height:0;border-bottom:1px solid var(--border);}
-.prompt-preview-hd{padding:4px 14px;font-size:9px;font-weight:800;letter-spacing:.22em;color:var(--chrome);text-transform:uppercase;border-bottom:1px solid var(--border);background:#040608;flex-shrink:0;}
-.prompt-preview-box{flex:1;overflow-y:auto;padding:8px 14px;font-family:monospace;font-size:9.5px;line-height:1.6;color:var(--text2);white-space:pre-wrap;word-break:break-word;}
-.prompt-preview-box .pp-key{color:var(--accent2);font-weight:700;text-shadow:0 0 6px rgba(0,200,192,.3);}
-.prompt-preview-box .pp-val{color:var(--text);}
 
 /* INFO BOX */
 .info-wrap{flex-shrink:0;border-top:1px solid var(--border);padding:7px 14px;background:#040608;min-height:62px;display:flex;flex-direction:column;justify-content:center;}
@@ -848,7 +850,7 @@ body{
 .info-text{font-size:11px;color:var(--text);line-height:1.5;}
 
 /* HISTORY */
-.history-wrap{flex-shrink:0;height:90px;overflow-y:auto;padding:6px 14px 8px;border-top:1px solid var(--border);}
+.history-wrap{flex-shrink:0;height:90px;overflow-y:auto;padding:6px 14px 8px;border-top:1px solid var(--border);-webkit-overflow-scrolling:touch;}
 .history-empty{font-size:11px;color:var(--text3);font-style:italic;text-align:center;padding:14px 0;}
 .history-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .clear-btn{height:20px;padding:0 8px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:8px;font-weight:700;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .1s;}
@@ -891,7 +893,27 @@ body{
 .faq-track{margin-bottom:8px;padding:9px 12px;background:#060A0F;border-radius:3px;border-left:3px solid var(--accent);}
 .faq-track-name{font-size:10px;font-weight:800;color:var(--accent2);margin-bottom:3px;letter-spacing:.06em;}
 .faq-track-desc{font-size:11px;color:var(--text2);line-height:1.6;}
-.faq-code{font-family:'Courier New',monospace;font-size:11px;background:#040608;padding:7px 10px;border-radius:3px;color:var(--accent2);margin:5px 0;display:block;border:1px solid var(--border);}
+.faq-code{font-family:'JetBrains Mono','Courier New',monospace;font-size:11px;background:#040608;padding:7px 10px;border-radius:3px;color:var(--accent2);margin:5px 0;display:block;border:1px solid var(--border);}
+
+/* ── iPAD / iOS ────────────────────────────────────────── */
+@supports(padding: env(safe-area-inset-bottom)){
+  body{ padding-bottom: env(safe-area-inset-bottom); }
+}
+.ch-btn,.ch-pwr,.run-btn,.launch-btn,.faq-btn,.clear-btn{
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
+@media(hover:none){
+  .ch-btn:hover{background:linear-gradient(180deg,#04080E 0%,#060C14 100%);border-color:var(--border2);color:var(--text2);text-shadow:none;}
+  .ch-btn.active:hover{background:linear-gradient(180deg,#001C22,#001018);color:var(--accent2);border-color:var(--accent);}
+}
+@media(max-width:1024px){
+  .hdr{height:48px;padding:0 12px;}
+  .fader-track{width:14px;}
+  .fader-thumb{width:48px;height:32px;}
+  .knob{width:42px;height:42px;}
+  .ch-btn{height:30px;}
+}
 </style>
 </head>
 <body>
@@ -913,7 +935,7 @@ body{
     <circle cx="52" cy="24" r="1.2" fill="#1A2E40"/>
     <rect width="56" height="28" rx="3" fill="none" stroke="#162030" stroke-width="1"/>
   </svg>
-  <span class="brand">control</span>
+  <span class="brand">gain</span>
   <div class="hdr-sep"></div>
   <div class="hdr-badge" id="hdr-badge">—</div>
   <div class="hdr-vals" id="hdr-vals">—</div>
@@ -991,12 +1013,11 @@ body{
 
   <!-- LEFT BANK: T1 + T2 -->
   <div class="channel-bank">
-    <div class="bank-hd">T1 · T2</div>
 
     <!-- CHANNEL T1: MODE / DRIVE -->
     <div class="ch t1">
       <div class="ch-accent"></div>
-      <div class="ch-hdr-row"><span class="ch-id">T1 — MODE</span><button class="ch-pwr" id="cpwr-t1" onclick="toggleTrack('t1')" title="Enable / mute track">◉</button></div>
+      <div class="ch-hdr-row"><span class="ch-id">Track 1 — MODE</span><button class="ch-pwr" id="cpwr-t1" onclick="toggleTrack('t1')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
         <div class="fader-lbl">INTENSITY</div>
@@ -1030,7 +1051,7 @@ body{
     <!-- CHANNEL T2: CONFIDENCE -->
     <div class="ch t2">
       <div class="ch-accent"></div>
-      <div class="ch-hdr-row"><span class="ch-id">T2 — CONF</span><button class="ch-pwr" id="cpwr-t2" onclick="toggleTrack('t2')" title="Enable / mute track">◉</button></div>
+      <div class="ch-hdr-row"><span class="ch-id">Track 2 — CONF</span><button class="ch-pwr" id="cpwr-t2" onclick="toggleTrack('t2')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
         <div class="fader-lbl">CERTAINTY</div>
@@ -1108,12 +1129,6 @@ body{
       </div>
     </div>
 
-    <!-- LIVE PROMPT PREVIEW -->
-    <div class="prompt-preview-wrap">
-      <div class="prompt-preview-hd">LIVE PROMPT</div>
-      <div class="prompt-preview-box" id="prompt-preview">—</div>
-    </div>
-
     <!-- INFO BOX -->
     <div class="info-wrap">
       <div class="info-label" id="info-label">hover any control</div>
@@ -1132,12 +1147,11 @@ body{
 
   <!-- RIGHT BANK: T3 + T4 -->
   <div class="channel-bank right">
-    <div class="bank-hd">T3 · T4</div>
 
     <!-- CHANNEL T3: SCOPE -->
     <div class="ch t3">
       <div class="ch-accent"></div>
-      <div class="ch-hdr-row"><span class="ch-id">T3 — SCOPE</span><button class="ch-pwr" id="cpwr-t3" onclick="toggleTrack('t3')" title="Enable / mute track">◉</button></div>
+      <div class="ch-hdr-row"><span class="ch-id">Track 3 — SCOPE</span><button class="ch-pwr" id="cpwr-t3" onclick="toggleTrack('t3')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
         <div class="fader-lbl">SCOPE</div>
@@ -1170,7 +1184,7 @@ body{
     <!-- CHANNEL T4: VOICE -->
     <div class="ch t4">
       <div class="ch-accent"></div>
-      <div class="ch-hdr-row"><span class="ch-id">T4 — VOICE</span><button class="ch-pwr" id="cpwr-t4" onclick="toggleTrack('t4')" title="Enable / mute track">◉</button></div>
+      <div class="ch-hdr-row"><span class="ch-id">Track 4 — VOICE</span><button class="ch-pwr" id="cpwr-t4" onclick="toggleTrack('t4')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
         <div class="fader-lbl">ROOM</div>
@@ -1593,7 +1607,7 @@ function applyState(s) {
     const mbtn = document.getElementById('mbtn-'+t);
     if (mbtn) mbtn.classList.toggle('active', !on);
   });
-  document.getElementById('prompt-preview').innerHTML = buildPromptPreview(s);
+  const pp = document.getElementById('prompt-preview'); if (pp) pp.innerHTML = buildPromptPreview(s);
 }
 
 async function set(field, value) {
@@ -1868,7 +1882,7 @@ async function runTask() {
   const task = taskInput.value.trim();
   if (!task || runBtn.disabled) return;
   runBtn.disabled = true; runBtn.textContent = '···';
-  respBox.textContent = ''; respWrap.classList.add('open');
+  respBox.textContent = ''; respWrap.classList.add('open'); respBox.scrollTop = 0;
   let full = '';
   const snap = {
     mode:      lastState.mode      || '—',
