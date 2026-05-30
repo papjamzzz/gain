@@ -1,0 +1,382 @@
+#!/usr/bin/env python3
+"""Control — physical control layer for Claude Code."""
+
+import sys
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+STATE_FILE     = Path.home() / ".streamfader" / "state.json"
+PID_FILE       = Path.home() / ".streamfader" / "ctrl.pid"
+LAST_TASK_FILE = Path.home() / ".streamfader" / "last_task.txt"
+VALID_MODES    = {"EXPLORE", "FIX", "BUILD"}
+DEFAULT_STATE  = {"mode": "BUILD", "intensity": 0.5, "depth": 0.5}
+
+
+# ── State ─────────────────────────────────────────────────────────────────────
+
+def load_state() -> dict:
+    try:
+        with open(STATE_FILE) as f:
+            raw = json.load(f)
+        mode = raw.get("mode", "")
+        if mode and mode not in VALID_MODES:  # empty = T1 muted/off, still valid
+            sys.exit(f"[ctrl] Invalid mode {mode!r}. Must be one of: {', '.join(VALID_MODES)}")
+        stance = raw.get("stance", "GUIDE")
+        if stance and stance not in ("LIST", "GUIDE", "DECIDE"):
+            stance = "GUIDE"
+        filter_ = raw.get("filter", "MODULE")
+        if filter_ and filter_ not in ("FILE", "MODULE", "PROJECT"):
+            filter_ = "MODULE"
+        voice = raw.get("voice", "STUDIO")
+        if voice and voice not in ("DIRECT", "STUDIO", "OPEN"):
+            voice = "STUDIO"
+        return {
+            "mode":      mode,
+            "intensity": max(0.0, min(1.0, float(raw.get("intensity", 0.5)))),
+            "depth":     max(0.0, min(1.0, float(raw.get("depth",     0.5)))),
+            "certainty": max(0.0, min(1.0, float(raw.get("certainty", 0.5)))),
+            "risk":      max(0.0, min(1.0, float(raw.get("risk",      0.5)))),
+            "stance":    stance,
+            "scope":     max(0.0, min(1.0, float(raw.get("scope",     0.5)))),
+            "bandwidth": max(0.0, min(1.0, float(raw.get("bandwidth", 0.5)))),
+            "filter":    filter_,
+            "room":      max(0.0, min(1.0, float(raw.get("room",      0.3)))),
+            "decay":     max(0.0, min(1.0, float(raw.get("decay",     0.3)))),
+            "voice":     voice,
+            "t1_on":     raw.get("t1_on", True),
+            "t2_on":     raw.get("t2_on", True),
+            "t3_on":     raw.get("t3_on", True),
+            "t4_on":     raw.get("t4_on", True),
+        }
+    except FileNotFoundError:
+        sys.exit(
+            f"[ctrl] State file not found: {STATE_FILE}\n"
+            f"      Run 'mvm init' to create a default state file."
+        )
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        sys.exit(f"[ctrl] State file error: {e}")
+
+
+# ── Header ────────────────────────────────────────────────────────────────────
+
+def _bar(v: float, width: int = 16) -> str:
+    filled = round(v * width)
+    return "█" * filled + "░" * (width - filled)
+
+
+def _level(v: float) -> str:
+    if v >= 0.7:
+        return "HIGH"
+    if v >= 0.4:
+        return "MED"
+    return "LOW"
+
+
+def print_header(state: dict) -> None:
+    mode      = state["mode"]
+    intensity = state["intensity"]
+    depth     = state["depth"]
+    W = 46
+    border = "─" * W
+    print(f"┌{border}┐")
+    print(f"│{'Control  ·  physical control layer':^{W}}│")
+    print(f"├{border}┤")
+    print(f"│  MODE       {mode:<{W - 13}}│")
+    print(f"│  INTENSITY  {_bar(intensity)}  {intensity:.2f}  {_level(intensity):<{W - 37}}│")
+    print(f"│  DEPTH      {_bar(depth)}  {depth:.2f}  {_level(depth):<{W - 37}}│")
+    print(f"└{border}┘")
+    print()
+
+
+# ── Prompt builder ────────────────────────────────────────────────────────────
+
+def build_system_prompt(state: dict) -> str:
+    t1_on = state.get("t1_on", True)
+    t2_on = state.get("t2_on", True)
+    t3_on = state.get("t3_on", True)
+    t4_on = state.get("t4_on", True)
+
+    rules = []
+
+    # T1 — Mode / Drive
+    if t1_on:
+        mode      = state.get("mode", "")
+        intensity = state["intensity"]
+        depth     = state["depth"]
+
+        if mode == "EXPLORE":
+            rules.append("MODE: EXPLORE\n- Analysis only. No code changes.\n- End with a single decision point. Nothing else.")
+        elif mode == "FIX":
+            rules.append("MODE: FIX\n- Identify one root cause only.\n- Produce one fix only.\n- Do not address secondary issues.")
+        elif mode == "BUILD":
+            rules.append("MODE: BUILD\n- Implement one atomic change only.\n- No refactoring unless explicitly required.")
+
+        if intensity >= 0.7:
+            rules.append("INTENSITY: HIGH — minimal output, direct execution only.")
+        elif intensity >= 0.4:
+            rules.append("INTENSITY: MED — concise reasoning, focused output.")
+        else:
+            rules.append("INTENSITY: LOW — verbose reasoning, exploratory tone.")
+
+        if depth >= 0.7:
+            rules.append("DEPTH: HIGH — deeper diagnostic reasoning allowed.")
+        elif depth >= 0.4:
+            rules.append("DEPTH: MED — moderate analysis depth.")
+        else:
+            rules.append("DEPTH: LOW — surface-level reasoning only.")
+
+    # T2 — Confidence
+    if t2_on:
+        certainty = state.get("certainty", 0.5)
+        risk      = state.get("risk",      0.5)
+        stance    = state.get("stance",    "")
+
+        if certainty >= 0.7:
+            rules.append("CERTAINTY: HIGH — commit to one solution, do not present alternatives.")
+        elif certainty >= 0.4:
+            rules.append("CERTAINTY: MED — give a recommendation with brief reasoning.")
+        else:
+            rules.append("CERTAINTY: LOW — show 2-3 approaches with pros and cons, do not pick.")
+
+        if risk >= 0.7:
+            rules.append("RISK: HIGH — best solution even if it requires significant changes.")
+        elif risk >= 0.4:
+            rules.append("RISK: MED — balanced approach, prefer existing patterns where reasonable.")
+        else:
+            rules.append("RISK: LOW — stay close to existing patterns, minimal disruption.")
+
+        if stance == "LIST":
+            rules.append("STANCE: LIST — present alternatives only, do not implement anything.")
+        elif stance == "DECIDE":
+            rules.append("STANCE: DECIDE — pick one approach and implement it, zero explanation of alternatives.")
+        elif stance == "GUIDE":
+            rules.append("STANCE: GUIDE — give your best recommendation with brief reasoning, then implement.")
+
+    # T3 — Scope
+    if t3_on:
+        scope     = state.get("scope",     0.5)
+        bandwidth = state.get("bandwidth", 0.5)
+        filter_   = state.get("filter",    "")
+
+        if scope >= 0.7:
+            rules.append("SCOPE: WIDE — consider the full codebase, pull in all related context.")
+        elif scope >= 0.4:
+            rules.append("SCOPE: MED — consider this module and its direct dependencies.")
+        else:
+            rules.append("SCOPE: NARROW — stay inside the immediate file or function only.")
+
+        if bandwidth >= 0.7:
+            rules.append("BANDWIDTH: WIDE — broad strokes, pull in adjacent concerns freely.")
+        elif bandwidth >= 0.4:
+            rules.append("BANDWIDTH: MED — shaped focus, related things welcome if directly relevant.")
+        else:
+            rules.append("BANDWIDTH: NARROW — surgical precision, touch nothing adjacent.")
+
+        if filter_ == "FILE":
+            rules.append("FILTER: FILE — strict local scope, this file only, no cross-module context.")
+        elif filter_ == "PROJECT":
+            rules.append("FILTER: PROJECT — full project scope allowed, global context welcome.")
+        elif filter_ == "MODULE":
+            rules.append("FILTER: MODULE — shaped band around the module, selective context.")
+
+    # T4 — Voice
+    if t4_on:
+        room  = state.get("room",  0.3)
+        decay = state.get("decay", 0.3)
+        voice = state.get("voice", "")
+
+        if room >= 0.7:
+            rules.append("ROOM: WET — open space around your output, breathing room, think out loud.")
+        elif room >= 0.4:
+            rules.append("ROOM: MED — some space, conversational but not dry.")
+        else:
+            rules.append("ROOM: DRY — close-mic'd, no space, just the output.")
+
+        if decay >= 0.7:
+            rules.append("DECAY: LONG — ideas can echo and build, spacious language.")
+        elif decay >= 0.4:
+            rules.append("DECAY: MED — moderate density, words earn their place.")
+        else:
+            rules.append("DECAY: SHORT — tight, compressed, every word counts.")
+
+        if voice == "DIRECT":
+            rules.append("VOICE: DIRECT — dead room, output only, zero commentary or preamble.")
+        elif voice == "OPEN":
+            rules.append("VOICE: OPEN — full resonance, collaborative, thinks out loud with you.")
+        elif voice == "STUDIO":
+            rules.append("VOICE: STUDIO — professional, measured, clean response with minimal framing.")
+
+    state_block = json.dumps({k: v for k, v in state.items() if not k.endswith("_on")})
+
+    return "\n".join([
+        *rules,
+        "",
+        "GLOBAL CONSTRAINTS:",
+        "- One action per run.",
+        "- No multi-step planning chains.",
+        "- No combined modes.",
+        "- Stop immediately after completing the task.",
+        "",
+        "OUTPUT FORMAT:",
+        "STATE:",
+        state_block,
+        "",
+        "ACTION:",
+        "<what you will do — one line>",
+        "",
+        "RESULT:",
+        "<final output>",
+    ])
+
+
+# ── Claude invocation ─────────────────────────────────────────────────────────
+
+def build_cmd(state: dict, task: str) -> list:
+    claude = shutil.which("claude")
+    if not claude:
+        sys.exit("[ctrl] 'claude' not found in PATH. Is Claude Code installed?")
+
+    mode          = state["mode"]
+    system_prompt = build_system_prompt(state)
+    full_prompt   = f"{system_prompt}\n\nTASK: {task}"
+
+    cmd = [claude, "--print"]
+
+    if mode and mode != "EXPLORE":
+        cmd += ["--permission-mode", "acceptEdits"]
+
+    cmd.append(full_prompt)
+    return cmd
+
+
+# ── Commands ──────────────────────────────────────────────────────────────────
+
+def cmd_run(task: str) -> None:
+    state = load_state()
+    print_header(state)
+    cmd = build_cmd(state, task)
+    # Save task so PLAY button can replay it
+    try:
+        LAST_TASK_FILE.parent.mkdir(parents=True, exist_ok=True)
+        LAST_TASK_FILE.write_text(task)
+    except Exception:
+        pass
+    try:
+        proc = subprocess.Popen(cmd, start_new_session=True)
+        try:
+            PID_FILE.write_text(str(proc.pid))
+        except Exception:
+            pass
+        proc.wait()
+        sys.exit(proc.returncode)
+    except KeyboardInterrupt:
+        proc.terminate()
+        print("\n[ctrl] Interrupted.")
+        sys.exit(130)
+    finally:
+        try:
+            PID_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def cmd_state() -> None:
+    state = load_state()
+    print_header(state)
+
+
+def cmd_init() -> None:
+    state_dir = Path.home() / ".streamfader"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_file = state_dir / "state.json"
+    if state_file.exists():
+        print(f"[ctrl] Already exists: {state_file}")
+        print(f"[ctrl] Current state:  {state_file.read_text().strip()}")
+    else:
+        state_file.write_text(json.dumps(DEFAULT_STATE, indent=2) + "\n")
+        print(f"[ctrl] Created: {state_file}")
+        print(f"[ctrl] Default: {json.dumps(DEFAULT_STATE)}")
+
+
+def cmd_foot(foot_args: list) -> None:
+    import subprocess
+    bridge = Path(__file__).resolve().parent / "foot_bridge.py"
+    if not bridge.exists():
+        sys.exit(f"[ctrl] foot_bridge.py not found at {bridge}")
+    result = subprocess.run([sys.executable, str(bridge)] + foot_args)
+    sys.exit(result.returncode)
+
+
+def cmd_nano(nano_args: list) -> None:
+    import subprocess
+    bridge = Path(__file__).resolve().parent / "nano_bridge.py"
+    if not bridge.exists():
+        sys.exit(f"[ctrl] nano_bridge.py not found at {bridge}")
+    result = subprocess.run([sys.executable, str(bridge)] + nano_args)
+    sys.exit(result.returncode)
+
+
+def cmd_ui(ui_args: list) -> None:
+    import subprocess
+    ui = Path(__file__).resolve().parent / "mvm_ui.py"
+    if not ui.exists():
+        sys.exit(f"[ctrl] mvm_ui.py not found at {ui}")
+    result = subprocess.run([sys.executable, str(ui)] + ui_args)
+    sys.exit(result.returncode)
+
+
+def usage() -> None:
+    print("Control — physical control layer for Claude Code")
+    print()
+    print("Usage:")
+    print('  ctrl run "<task>"     Execute task under current state')
+    print("  ctrl state            Print current state")
+    print("  ctrl init             Create default ~/.streamfader/state.json")
+    print("  ctrl foot --scan      Print raw input from foot controller")
+    print("  ctrl foot --config    Interactive pedal mapping wizard")
+    print("  ctrl foot --start     Start foot controller bridge (default)")
+    print("  ctrl nano --scan      List MIDI ports + print raw nanoKONTROL2 input")
+    print("  ctrl nano --start     Start nanoKONTROL2 bridge (default)")
+    print("  ctrl ui               Start visual console UI at http://127.0.0.1:5570")
+
+
+# ── Entry ─────────────────────────────────────────────────────────────────────
+
+def main() -> None:
+    args = sys.argv[1:]
+
+    if not args:
+        usage()
+        sys.exit(1)
+
+    command = args[0]
+
+    if command == "run":
+        if len(args) < 2:
+            sys.exit('Usage: ctrl run "<task>"')
+        cmd_run(args[1])
+
+    elif command == "state":
+        cmd_state()
+
+    elif command == "init":
+        cmd_init()
+
+    elif command == "foot":
+        cmd_foot(args[1:])
+
+    elif command == "nano":
+        cmd_nano(args[1:])
+
+    elif command == "ui":
+        cmd_ui(args[1:])
+
+    else:
+        usage()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
