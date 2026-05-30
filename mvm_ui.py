@@ -130,7 +130,7 @@ def read_state() -> dict:
             "mode": "BUILD", "intensity": 0.5, "depth": 0.5,
             "certainty": 0.5, "risk": 0.5, "stance": "GUIDE",
             "scope": 0.5, "bandwidth": 0.5, "filter": "MODULE",
-            "room": 0.3, "decay": 0.3, "voice": "STUDIO",
+            "room": 0.5, "decay": 0.5, "voice": "STUDIO",
         }
 
 def write_state(state: dict) -> None:
@@ -1378,7 +1378,7 @@ const KNOBS = {
   bandwidth: {dot:'kd-bandwidth', val:'kv-bandwidth'},
   decay:     {dot:'kd-decay',     val:'kv-decay'},
 };
-const FIELD_DEFAULTS = {room:0.3, decay:0.3};
+const FIELD_DEFAULTS = {};
 const METERS   = ['intensity','depth','certainty','risk','scope','bandwidth','room','decay'];
 const BADGE_C  = {EXPLORE:'#00A8A0', FIX:'#8B5CF6', BUILD:'#00C8C0'};
 const PILL_C   = ['#00C8C0','#8B5CF6','#00A0A8','#6040C8'];
