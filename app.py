@@ -1,6 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
-import os, json
+import os, json, requests
 from pathlib import Path
 from datetime import datetime
 
@@ -33,6 +33,21 @@ def waitlist():
         return jsonify({'status': 'already_registered'})
     entries.append({'email': email, 'joined': datetime.utcnow().isoformat()})
     save_waitlist(entries)
+    # Forward to your inbox via Resend
+    resend_key = os.getenv('RESEND_API_KEY', '')
+    if resend_key:
+        try:
+            requests.post('https://api.resend.com/emails', headers={
+                'Authorization': f'Bearer {resend_key}',
+                'Content-Type': 'application/json'
+            }, json={
+                'from': 'Gain <noreply@creativekonsoles.com>',
+                'to': ['jeremiahstephensmith@gmail.com'],
+                'subject': f'Gain waitlist: {email}',
+                'html': f'<p>New signup: <strong>{email}</strong></p><p>{datetime.utcnow().isoformat()}</p>'
+            }, timeout=5)
+        except Exception:
+            pass
     return jsonify({'status': 'ok'})
 
 @app.route('/api/status')
