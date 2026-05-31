@@ -57,79 +57,51 @@
       z-index: 10;
     }
 
-    /* ── CENTER CONTENT ── */
-    .center {
-      position: fixed;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    .tagline {
-      font-size: clamp(13px, 1.4vw, 16px);
-      font-weight: 700;
-      letter-spacing: .22em;
-      text-transform: uppercase;
-      color: rgba(180,220,240,.7);
-      text-shadow: 0 0 20px rgba(0,200,255,.3);
-    }
-
     /* ── BOTTOM EMAIL FORM ── */
     .bottom {
       position: fixed;
-      bottom: 40px; left: 50%;
-      transform: translateX(-50%);
+      bottom: 48px; left: 40px;
       z-index: 10;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
       width: 100%;
-      max-width: 420px;
-      padding: 0 20px;
-    }
-
-    .dial-text {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: .18em;
-      text-transform: uppercase;
-      color: rgba(0,200,192,.6);
+      max-width: 460px;
+      padding: 0;
     }
 
     .form-row {
       display: flex;
-      gap: 8px;
+      gap: 10px;
       width: 100%;
     }
 
     .email-input {
       flex: 1;
-      height: 44px;
-      background: rgba(6,10,15,.75);
-      border: 1px solid rgba(0,200,192,.3);
+      height: 50px;
+      background: rgba(6,10,15,.8);
+      border: 1px solid rgba(220,40,40,.4);
       border-radius: 3px;
-      color: #C8DCEA;
-      font-size: 14px;
+      color: #E8D0D0;
+      font-size: 15px;
       font-family: 'Inter', sans-serif;
-      padding: 0 14px;
+      padding: 0 16px;
       outline: none;
       backdrop-filter: blur(8px);
       transition: border-color .2s;
     }
-    .email-input::placeholder { color: rgba(100,140,160,.5); }
-    .email-input:focus { border-color: rgba(0,200,192,.7); }
+    .email-input::placeholder { color: rgba(180,100,100,.5); }
+    .email-input:focus { border-color: rgba(220,40,40,.8); }
 
     .join-btn {
-      height: 44px;
-      padding: 0 20px;
-      background: rgba(0,200,192,.12);
-      border: 1px solid rgba(0,200,192,.5);
+      height: 50px;
+      padding: 0 24px;
+      background: rgba(200,20,20,.85);
+      border: 1px solid rgba(255,60,60,.7);
       border-radius: 3px;
-      color: #00E8E0;
-      font-size: 11px;
+      color: #fff;
+      font-size: 12px;
       font-weight: 800;
       letter-spacing: .12em;
       text-transform: uppercase;
@@ -137,25 +109,25 @@
       white-space: nowrap;
       transition: all .15s;
       backdrop-filter: blur(8px);
-      box-shadow: 0 0 16px rgba(0,200,192,.15);
+      box-shadow: 0 0 24px rgba(200,20,20,.5);
     }
-    .join-btn:hover { background: rgba(0,200,192,.22); border-color: rgba(0,200,192,.8); }
+    .join-btn:hover { background: rgba(220,30,30,.95); box-shadow: 0 0 32px rgba(220,30,30,.7); }
     .join-btn:disabled { opacity: .4; cursor: not-allowed; }
 
     .status-msg {
       font-size: 12px;
       font-weight: 600;
       letter-spacing: .06em;
-      color: #00C8C0;
+      color: #FF6060;
       min-height: 18px;
-      text-align: center;
+      text-align: left;
     }
-    .status-msg.err { color: #E05050; }
+    .status-msg.err { color: #FF4040; }
 
     /* ── MOBILE ── */
     @media (max-width: 600px) {
       .bg-video { height: 100vh; width: auto; }
-      .center { width: 90%; }
+      .bottom { left: 20px; right: 20px; max-width: calc(100% - 40px); bottom: 36px; }
     }
   </style>
 </head>
@@ -169,12 +141,7 @@
 
   <div class="brand">gain</div>
 
-  <div class="center">
-    <div class="tagline">a behavioral mixing board for AI</div>
-  </div>
-
   <div class="bottom">
-    <div class="dial-text">dial it in.</div>
     <div class="form-row">
       <input class="email-input" id="email" type="email" placeholder="your email">
       <button class="join-btn" id="join-btn" onclick="joinWaitlist()">GET EARLY ACCESS</button>
