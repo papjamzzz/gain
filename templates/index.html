@@ -60,33 +60,33 @@
     /* ── BOTTOM EMAIL FORM ── */
     .bottom {
       position: fixed;
-      bottom: 48px; left: 40px;
+      bottom: 18px; left: 14px;
       z-index: 10;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 12px;
+      gap: 8px;
       width: 100%;
-      max-width: 460px;
+      max-width: 380px;
       padding: 0;
     }
 
     .form-row {
       display: flex;
-      gap: 10px;
+      gap: 8px;
       width: 100%;
     }
 
     .email-input {
       flex: 1;
-      height: 50px;
+      height: 40px;
       background: rgba(6,10,15,.8);
       border: 1px solid rgba(220,40,40,.4);
       border-radius: 3px;
       color: #E8D0D0;
-      font-size: 15px;
+      font-size: 13px;
       font-family: 'Inter', sans-serif;
-      padding: 0 16px;
+      padding: 0 13px;
       outline: none;
       backdrop-filter: blur(8px);
       transition: border-color .2s;
@@ -95,13 +95,13 @@
     .email-input:focus { border-color: rgba(220,40,40,.8); }
 
     .join-btn {
-      height: 50px;
-      padding: 0 24px;
+      height: 40px;
+      padding: 0 18px;
       background: rgba(200,20,20,.85);
       border: 1px solid rgba(255,60,60,.7);
       border-radius: 3px;
       color: #fff;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
       letter-spacing: .12em;
       text-transform: uppercase;
@@ -109,17 +109,17 @@
       white-space: nowrap;
       transition: all .15s;
       backdrop-filter: blur(8px);
-      box-shadow: 0 0 24px rgba(200,20,20,.5);
+      box-shadow: 0 0 20px rgba(200,20,20,.5);
     }
-    .join-btn:hover { background: rgba(220,30,30,.95); box-shadow: 0 0 32px rgba(220,30,30,.7); }
+    .join-btn:hover { background: rgba(220,30,30,.95); box-shadow: 0 0 28px rgba(220,30,30,.7); }
     .join-btn:disabled { opacity: .4; cursor: not-allowed; }
 
     .status-msg {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: .06em;
       color: #FF6060;
-      min-height: 18px;
+      min-height: 16px;
       text-align: left;
     }
     .status-msg.err { color: #FF4040; }
@@ -127,7 +127,7 @@
     /* ── MOBILE ── */
     @media (max-width: 600px) {
       .bg-video { height: 100vh; width: auto; }
-      .bottom { left: 20px; right: 20px; max-width: calc(100% - 40px); bottom: 36px; }
+      .bottom { left: 12px; right: 12px; max-width: calc(100% - 24px); bottom: 14px; }
     }
   </style>
 </head>
