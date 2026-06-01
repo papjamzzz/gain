@@ -3,3 +3,4 @@ gunicorn
 python-dotenv>=1.0.0
 anthropic>=0.25.0
 requests
+supabase>=2.0.0

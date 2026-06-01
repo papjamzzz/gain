@@ -4,9 +4,11 @@
 import json
 import time
 import os
+import signal
 import importlib.util
 from pathlib import Path
-from flask import Flask, Response, request, jsonify
+from flask import Flask, Response, request, jsonify, render_template, redirect, url_for
+from functools import wraps
 
 try:
     from dotenv import load_dotenv
@@ -21,6 +23,7 @@ except ImportError:
 
 STATE_FILE   = Path.home() / ".streamfader" / "state.json"
 PRESETS_DIR  = Path.home() / ".streamfader" / "presets"
+PID_FILE     = Path.home() / ".streamfader" / "ctrl.pid"
 PORT  = int(os.environ.get("PORT", 5570))
 MODEL = os.environ.get("CTRL_MODEL", "claude-sonnet-4-6")
 
@@ -147,8 +150,71 @@ def write_state(state: dict) -> None:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+SUPABASE_URL     = os.environ.get("SUPABASE_URL", "")
+SUPABASE_ANON    = os.environ.get("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE = os.environ.get("SUPABASE_SERVICE_KEY", "")
+
+def require_auth(f):
+    """Validate Supabase JWT from Authorization header or cookie."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Skip auth in local dev if no Supabase keys configured
+        if not SUPABASE_URL:
+            return f(*args, **kwargs)
+        token = None
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+        if not token:
+            token = request.cookies.get("sb-access-token")
+        if not token:
+            # Browser request — redirect to login
+            if request.headers.get("Accept", "").startswith("text/html"):
+                return redirect("/login")
+            return jsonify({"error": "unauthorized"}), 401
+        try:
+            from supabase import create_client
+            sb = create_client(SUPABASE_URL, SUPABASE_SERVICE)
+            user = sb.auth.get_user(token)
+            if not user or not user.user:
+                raise Exception("invalid token")
+        except Exception:
+            if request.headers.get("Accept", "").startswith("text/html"):
+                return redirect("/login")
+            return jsonify({"error": "unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route("/login")
+def login():
+    return render_template("login.html",
+        supabase_url=SUPABASE_URL,
+        supabase_anon_key=SUPABASE_ANON)
+
+@app.route("/auth/callback")
+def auth_callback():
+    # Supabase handles the token exchange client-side via JS
+    # This route just serves a redirect page that picks up the session
+    return """<!DOCTYPE html><html><head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient('""" + SUPABASE_URL + """','""" + SUPABASE_ANON + """');
+sb.auth.onAuthStateChange((event, session) => {
+  if (session) window.location.href = '/app';
+  else window.location.href = '/login';
+});
+</script></head><body style="background:#000;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;font-size:13px;letter-spacing:.1em">
+SIGNING IN…</body></html>"""
+
+@app.route("/app")
+@require_auth
+def app_view():
+    return HTML
+
 @app.route("/")
 def index():
+    if SUPABASE_URL:
+        return redirect("/login")
     return HTML
 
 @app.route("/stream")
@@ -307,6 +373,19 @@ def save_preset():
     (PRESETS_DIR / f"{safe}.json").write_text(json.dumps(read_state(), indent=2) + "\n")
     return jsonify({"ok": True, "name": safe})
 
+@app.route("/abort", methods=["POST"])
+def abort_run():
+    try:
+        pid = int(PID_FILE.read_text().strip())
+        os.killpg(os.getpgid(pid), signal.SIGTERM)
+        PID_FILE.unlink(missing_ok=True)
+        return jsonify({"ok": True, "killed": pid})
+    except (FileNotFoundError, ValueError):
+        return jsonify({"ok": False, "reason": "no process running"})
+    except (ProcessLookupError, OSError):
+        PID_FILE.unlink(missing_ok=True)
+        return jsonify({"ok": False, "reason": "process already gone"})
+
 @app.route("/presets/load", methods=["POST"])
 def load_preset():
     data = request.get_json() or {}
@@ -349,16 +428,16 @@ HTML = r"""<!DOCTYPE html>
   --panel2:    #101820;
   --border:    #162030;
   --border2:   #1E2E40;
-  --accent:    #00C8C0;
-  --accent2:   #00E8E0;
+  --accent:    #00DDD4;
+  --accent2:   #10F2E8;
   --purple:    #8B5CF6;
   --purple2:   #A78BFA;
-  --green:     #00C8C0;
-  --text:      #C8DCEA;
-  --text2:     #607A94;
-  --text3:     #3A5268;
-  --chrome:    #5A8098;
-  --chrome2:   #8ABACE;
+  --green:     #00DDD4;
+  --text:      #D8EAF8;
+  --text2:     #6A8AA8;
+  --text3:     #405870;
+  --chrome:    #6A90A8;
+  --chrome2:   #A8D0E0;
   --fader-bg:  #040608;
   --fader-trk: #020406;
   --thumb-hi:  #A8C4D8;
@@ -382,12 +461,12 @@ body{
   background:#030507;
   background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 3px);
   display:flex;align-items:center;
-  flex-shrink:0;height:42px;
+  flex-shrink:0;height:82px;
   box-shadow:0 1px 0 rgba(0,200,192,.1);
   position:relative;
 }
 .brand{
-  font-family:'Abril Fatface',serif;font-size:26px;letter-spacing:.06em;line-height:42px;
+  font-family:'Abril Fatface',serif;font-size:41px;letter-spacing:.06em;line-height:82px;
   background:linear-gradient(130deg,#00E8FF 0%,#A0C8FF 50%,#C0A0FF 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 0 6px rgba(0,200,255,.55)) drop-shadow(0 0 14px rgba(160,100,255,.3));
@@ -395,20 +474,33 @@ body{
 }
 .hdr-center{
   position:absolute;left:50%;transform:translateX(-50%);
-  display:flex;align-items:center;gap:10px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
   pointer-events:none;
 }
-.hdr-badge{
-  font-size:11px;font-weight:800;letter-spacing:.14em;
-  padding:3px 10px;border-radius:2px;border-left:2px solid;
-  transition:all .25s;
+.hdr-settings-label{
+  font-size:8.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--accent);opacity:.7;
 }
-.hdr-vals{font-size:11px;color:#9BBDD6;letter-spacing:.06em;font-weight:600;font-variant-numeric:tabular-nums;}
-.hdr-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.hdr-settings{
+  font-size:9px;font-weight:700;color:#C8DCEA;
+  letter-spacing:.04em;font-variant-numeric:tabular-nums;
+  white-space:nowrap;text-align:center;
+  text-shadow:0 0 12px rgba(0,200,192,.25);
+}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.reset-btn{
+  height:27px;padding:0 11px;border-radius:3px;
+  border:1px solid rgba(0,200,192,.3);background:rgba(0,200,192,.06);
+  color:var(--accent);font-size:8px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap;
+  box-shadow:0 0 8px rgba(0,200,192,.1);
+  flex-shrink:0;
+}
+.reset-btn:hover{background:rgba(0,200,192,.16);border-color:var(--accent);box-shadow:0 0 16px rgba(0,200,192,.28);}
 .faq-btn{
-  width:36px;height:36px;border-radius:50%;
+  width:44px;height:44px;border-radius:50%;
   border:1px solid var(--accent);background:rgba(0,200,192,.07);
-  color:var(--accent);font-size:16px;font-weight:800;
+  color:var(--accent);font-size:20px;font-weight:800;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .15s;line-height:1;
   box-shadow:0 0 10px rgba(0,200,192,.28),0 0 20px rgba(0,200,192,.12);
@@ -416,6 +508,193 @@ body{
   flex-shrink:0;
 }
 .faq-btn:hover{background:rgba(0,200,192,.16);color:var(--accent2);border-color:var(--accent2);box-shadow:0 0 16px rgba(0,200,192,.48),0 0 32px rgba(0,200,192,.22);}
+.theme-btn{
+  width:28px;height:28px;border-radius:50%;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--text3);font-size:13px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;line-height:1;flex-shrink:0;
+}
+.theme-btn:hover{border-color:var(--chrome);color:var(--text2);}
+
+/* ══ LIGHT THEME ════════════════════════════════════════════ */
+body.light{
+  --bg:        #EDEBE7;
+  --panel:     #F5F3F0;
+  --panel2:    #E4E1DC;
+  --border:    rgba(0,0,0,.10);
+  --border2:   rgba(0,0,0,.16);
+  --accent:    #007E78;
+  --accent2:   #009E96;
+  --purple:    #6D28D9;
+  --purple2:   #7C3AED;
+  --text:      #1C2B3A;
+  --text2:     #3D5570;
+  --text3:     #7A96B0;
+  --chrome:    #5A7898;
+  --chrome2:   #3A5878;
+  --fader-bg:  #D8D4CE;
+  --fader-trk: #C8C4BE;
+  --thumb-hi:  #F8F6F2;
+  --thumb-lo:  #888078;
+  --magenta:   #B020C8;
+  --magenta2:  #C026D3;
+  background-image:radial-gradient(rgba(0,80,80,.05) 1px,transparent 1px);
+  background-size:28px 28px;
+}
+body.light .hdr{
+  background:#E8E5E0;
+  background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 3px);
+  box-shadow:0 1px 0 rgba(0,130,120,.12);
+}
+body.light .brand{
+  background:linear-gradient(130deg,#006E80 0%,#004E70 50%,#5030A0 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  filter:none;
+}
+body.light .hdr-settings{color:#2A3E52;}
+body.light .reset-btn{
+  border-color:rgba(0,126,120,.35);background:rgba(0,126,120,.06);
+  box-shadow:none;
+}
+body.light .reset-btn:hover{background:rgba(0,126,120,.14);border-color:var(--accent);}
+body.light .faq-btn{
+  border-color:var(--accent);background:rgba(0,126,120,.06);
+  box-shadow:none;text-shadow:none;
+}
+body.light .channel-bank{
+  background:linear-gradient(180deg,#EAE7E2 0%,#E2DED8 100%);
+  box-shadow:inset -1px 0 0 rgba(0,0,0,.06);
+}
+body.light .bank-hd{background:#E2DED8;}
+body.light .section-hd{color:var(--chrome);}
+body.light .ch-hdr-row{background:#DDD9D3;border-color:var(--border);}
+body.light .ch-id{color:var(--text2);}
+body.light .fader-lbl{color:var(--chrome);}
+body.light .fader-val{color:var(--accent);text-shadow:none;}
+body.light .fader-track{
+  background:linear-gradient(180deg,#C8C4BC 0%,#D4D0C8 50%,#C8C4BC 100%);
+  border-color:#B8B4AC;
+  border-left-color:#C0BDB4;
+  border-right-color:#C0BDB4;
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,.18),
+    inset 1px 0 3px rgba(0,0,0,.10),
+    inset -1px 0 3px rgba(0,0,0,.10),
+    inset 0 1px 0 rgba(255,255,255,.5),
+    0 0 0 1px rgba(0,100,120,.04);
+}
+body.light .fader-fill{
+  background:linear-gradient(0deg,
+    rgba(0,100,100,.06) 0%,
+    rgba(0,130,125,.18) 35%,
+    rgba(0,155,148,.34) 65%,
+    rgba(0,175,168,.52) 85%,
+    rgba(0,185,178,.68) 100%
+  );
+  box-shadow:0 0 6px rgba(0,130,120,.22),inset 0 0 4px rgba(0,150,145,.10);
+}
+body.light .ch.t2 .fader-fill,body.light .ch.t4 .fader-fill{
+  background:linear-gradient(0deg,
+    rgba(90,30,160,.05) 0%,
+    rgba(100,40,180,.14) 35%,
+    rgba(115,60,200,.28) 65%,
+    rgba(130,80,220,.44) 85%,
+    rgba(140,95,235,.58) 100%
+  );
+  box-shadow:0 0 6px rgba(109,40,217,.20),inset 0 0 4px rgba(120,60,210,.08);
+}
+body.light .fader-thumb{
+  background:linear-gradient(180deg,
+    #FAFAF8 0%,
+    #EAE8E4 4%,
+    #C8C4BC 16%,
+    #A8A49C 34%,
+    #8C887E 47%,
+    #888078 50%,
+    #8C887E 53%,
+    #A8A49C 66%,
+    #C8C4BC 84%,
+    #EAE8E4 96%,
+    #FAFAF8 100%
+  );
+  border-color:#A0A098;
+  border-top-color:#FEFEFE;
+  border-bottom-color:#888078;
+  box-shadow:
+    0 2px 8px rgba(0,0,0,.28),
+    0 0 0 1px rgba(0,0,0,.10),
+    inset 0 2px 0 rgba(255,255,255,.7),
+    inset 0 -1px 0 rgba(0,0,0,.15);
+}
+body.light .fader-thumb::before,body.light .fader-thumb::after{
+  background:linear-gradient(90deg,transparent,rgba(0,0,0,.18) 25%,rgba(0,0,0,.18) 75%,transparent);
+}
+body.light .fader-thumb .thumb-center{
+  background:linear-gradient(90deg,transparent,rgba(0,140,135,.85) 12%,rgba(0,160,155,1) 50%,rgba(0,140,135,.85) 88%,transparent);
+  box-shadow:0 0 4px rgba(0,140,130,.6),0 0 10px rgba(0,130,120,.25);
+}
+body.light .fader-track.dragging .fader-thumb,
+body.light .fader-track.value-active .fader-thumb{
+  box-shadow:
+    0 2px 10px rgba(0,0,0,.35),
+    0 0 16px rgba(0,160,150,.45),
+    0 0 0 1px rgba(0,180,170,.28),
+    inset 0 2px 0 rgba(255,255,255,.8);
+  border-top-color:#FFFFFF;
+}
+body.light .knob{
+  background:conic-gradient(#C8C4BC 0deg 225deg,#C8C4BC 225deg 360deg);
+  box-shadow:
+    0 3px 10px rgba(0,0,0,.22),
+    0 0 0 1px rgba(0,0,0,.14),
+    0 0 0 2px rgba(255,255,255,.55),
+    inset 0 1px 0 rgba(255,255,255,.5);
+}
+body.light .knob-body{
+  background:radial-gradient(circle at 36% 30%,#DEDAD4 0%,#C8C4BE 28%,#B0ACA5 58%,#A8A49C 100%);
+  border-color:rgba(0,0,0,.18);
+  box-shadow:
+    inset 0 3px 7px rgba(255,255,255,.7),
+    inset 0 -3px 9px rgba(0,0,0,.20),
+    inset 0 0 18px rgba(0,0,0,.08);
+}
+body.light .knob-val{text-shadow:none;}
+body.light .knob-lbl{color:var(--chrome);}
+body.light .ch-btn{
+  border-color:var(--border2);background:rgba(0,0,0,.03);color:var(--text2);
+}
+body.light .ch-btn:hover{background:rgba(0,126,120,.08);border-color:var(--accent);color:var(--accent);}
+body.light .ch-btn.active{background:rgba(0,126,120,.14);border-color:var(--accent);color:var(--accent);}
+body.light .meter-track{background:#C8C4BC;}
+body.light .meter-fill{
+  background:linear-gradient(90deg,#005850 0%,var(--accent) 65%,var(--accent2) 100%);
+  box-shadow:none;
+}
+body.light .meter-val{text-shadow:none;}
+body.light .meter-lvl{color:var(--text3);}
+body.light .pill{border-color:var(--border2);background:rgba(0,0,0,.04);color:var(--text2);}
+body.light .pill.active{background:rgba(0,126,120,.12);border-color:var(--accent);color:var(--accent);}
+body.light .right-col{background:linear-gradient(180deg,#EAE7E2 0%,#E2DED8 100%);}
+body.light .meters-wrap,.body.light .pills-wrap,.body.light .presets-wrap{border-color:var(--border);}
+body.light .section-bg{background:#E2DED8;}
+body.light .output-wrap{background:#F0EDE8;border-color:var(--border);}
+body.light .output-box{background:#F8F6F2;color:var(--text);border-color:var(--border);}
+body.light .launch-btn{border-color:rgba(0,126,120,.4);background:rgba(0,126,120,.06);color:var(--accent);}
+body.light .launch-btn:hover{background:rgba(0,126,120,.14);}
+body.light .preset-input{background:#F0EDE8;border-color:var(--border2);color:var(--text);}
+body.light .preset-save-btn{border-color:rgba(0,126,120,.4);background:rgba(0,126,120,.06);color:var(--accent);}
+body.light .abort-btn{border-color:rgba(200,40,40,.3);color:rgba(180,40,40,.55);}
+body.light .abort-btn:hover{border-color:#CC2020;color:#CC2020;background:rgba(200,40,40,.07);}
+body.light .hero-tagline{color:#4A3000;text-shadow:0 0 3px rgba(255,220,100,.8),0 0 8px rgba(255,160,20,.5),0 0 16px rgba(255,100,0,.3);}
+body.light .hero-brand{color:rgba(0,100,90,.06);}
+body.light .copy-btn{background:rgba(240,237,232,.9);border-color:var(--border2);}
+body.light .history-item{border-color:var(--border);}
+body.light .hc-time,.body.light .hc-mode,.body.light .hc-peek{color:var(--text3);}
+body.light .preset-empty{color:var(--text3);}
+body.light .preset-name{color:var(--text);}
+body.light .api-tag{background:rgba(0,126,120,.06);border-color:rgba(0,126,120,.2);color:var(--accent);}
+body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 0 2px 6px rgba(0,0,0,.15),0 0 0 1px rgba(200,130,0,.15);}
 
 /* ── HERO ───────────────────────────────────────────────── */
 .hero{position:relative;flex-shrink:0;height:108px;overflow:hidden;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,200,192,.12);}
@@ -488,6 +767,27 @@ body{
   color:rgba(210,80,80,.6);
   box-shadow:0 0 5px rgba(200,40,40,.12);
 }
+/* ── PICKUP MODE (soft takeover) ────────────────────────── */
+.fader-ghost{
+  position:absolute;
+  width:44px;height:4px;
+  left:50%;transform:translateX(-50%);
+  background:rgba(255,210,60,.55);
+  border-radius:2px;
+  pointer-events:none;
+  display:none;z-index:4;
+  box-shadow:0 0 6px rgba(255,200,40,.5);
+}
+.fader-ghost.active{display:block;}
+.pickup-label{
+  position:absolute;top:2px;left:50%;transform:translateX(-50%);
+  font-size:6px;font-weight:900;letter-spacing:.1em;color:rgba(255,210,60,.9);
+  background:rgba(0,0,0,.7);padding:1px 4px;border-radius:2px;
+  pointer-events:none;z-index:5;white-space:nowrap;display:none;
+}
+.pickup-label.active{display:block;}
+.fader-track.pickup{border-color:rgba(255,200,40,.35);box-shadow:inset 0 8px 16px rgba(0,0,0,1),inset 2px 0 6px rgba(0,0,0,.85),inset -2px 0 6px rgba(0,0,0,.85),0 0 0 1px rgba(255,200,40,.12);}
+
 /* dim fader+knob when muted; keep buttons accessible */
 .ch.ch-off .fader-wrap,
 .ch.ch-off .knob-wrap{
@@ -545,23 +845,19 @@ body{
   width:100%;flex:1;min-height:60px;
   display:flex;justify-content:center;align-items:stretch;
 }
-/* tick marks column */
+/* tick marks column — labels removed, lines only */
 .fader-ticks{
   position:absolute;right:calc(50% + 7px);top:0;bottom:0;
-  width:16px;display:flex;flex-direction:column;
+  width:8px;display:flex;flex-direction:column;
   justify-content:space-between;padding:0;
   pointer-events:none;
 }
 .tick{
-  display:flex;align-items:center;gap:2px;justify-content:flex-end;
+  display:flex;align-items:center;justify-content:flex-end;
   height:1px;
 }
 .tick-line{height:1px;background:var(--border2);flex-shrink:0;}
 .tick-line.major{background:var(--chrome);height:1px;}
-.tick-lbl{
-  font-size:6px;color:var(--text3);font-variant-numeric:tabular-nums;
-  font-weight:600;letter-spacing:0;line-height:1;white-space:nowrap;
-}
 
 /* the groove/track — deep carved console slot */
 .fader-track{
@@ -795,9 +1091,10 @@ body{
 }
 .ch-btn:hover{background:var(--panel2);border-color:var(--accent);color:var(--accent2);text-shadow:0 0 8px rgba(0,200,255,.5);}
 .ch-btn.active{
-  background:linear-gradient(180deg,#001C22,#001018);
-  color:var(--accent2);border-color:var(--accent);
-  text-shadow:0 0 6px rgba(0,232,255,.8),0 0 14px rgba(0,196,232,.4);
+  background:linear-gradient(180deg,#002830,#001820);
+  color:#20F8EE;border-color:#00DDD4;
+  text-shadow:0 0 8px rgba(0,248,238,1),0 0 18px rgba(0,220,212,.6);
+  box-shadow:inset 0 0 10px rgba(0,221,212,.08),0 0 6px rgba(0,221,212,.2);
   animation:btn-pulse 2.4s ease-in-out infinite;
 }
 
@@ -904,6 +1201,9 @@ body{
 .preset-input:focus{outline:none;border-color:var(--accent);}
 .preset-save-btn{height:22px;padding:0 10px;border-radius:2px;border:1px solid var(--accent);background:rgba(0,200,192,.07);color:var(--accent);font-size:9px;font-weight:800;letter-spacing:.08em;cursor:pointer;transition:all .1s;flex-shrink:0;}
 .preset-save-btn:hover{background:rgba(0,200,192,.18);}
+.abort-btn{display:block;margin-top:4px;padding:2px 7px;height:16px;border-radius:2px;border:1px solid rgba(255,59,59,.4);background:transparent;color:rgba(255,80,80,.6);font-size:7px;font-weight:800;letter-spacing:.1em;cursor:pointer;transition:all .1s;text-transform:uppercase;line-height:1;}
+.abort-btn:hover{border-color:#FF3B3B;color:#FF3B3B;background:rgba(255,59,59,.08);}
+.abort-btn.firing{border-color:#FF6060;color:#FF6060;background:rgba(255,59,59,.2);}
 .preset-list{display:flex;flex-wrap:wrap;gap:4px;min-height:16px;}
 .preset-item{display:flex;align-items:center;gap:3px;background:#0A141E;border:1px solid var(--border2);border-radius:2px;padding:2px 4px 2px 8px;transition:border-color .1s;}
 .preset-item:hover{border-color:var(--accent);}
@@ -919,14 +1219,10 @@ body{
 .copy-btn.copied{color:#50C878;border-color:#50C878;opacity:1;}
 
 
-/* INFO BOX */
-.info-wrap{flex-shrink:0;border-top:1px solid var(--border);padding:7px 14px;background:#040608;min-height:62px;display:flex;flex-direction:column;justify-content:center;}
-.info-label{font-size:9px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;text-shadow:0 0 8px rgba(0,200,192,.4);}
-.info-text{font-size:11px;color:var(--text);line-height:1.5;}
 
 /* HISTORY */
-.history-wrap{flex-shrink:0;height:90px;overflow-y:auto;padding:6px 14px 8px;border-top:1px solid var(--border);-webkit-overflow-scrolling:touch;}
-.history-empty{font-size:11px;color:var(--text3);font-style:italic;text-align:center;padding:14px 0;}
+.history-wrap{flex-shrink:0;min-height:120px;max-height:220px;overflow-y:auto;padding:6px 14px 8px;border-top:1px solid var(--border);-webkit-overflow-scrolling:touch;}
+.history-empty{font-size:11px;color:var(--text3);font-style:italic;text-align:center;padding:18px 0;}
 .history-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
 .clear-btn{height:20px;padding:0 8px;border-radius:2px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:8px;font-weight:700;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;transition:all .1s;}
 .clear-btn:hover{background:#4A1010;color:#F08080;border-color:#7F1D1D;}
@@ -997,10 +1293,12 @@ body{
 <div class="hdr">
   <span class="brand">gain</span>
   <div class="hdr-center">
-    <div class="hdr-badge" id="hdr-badge">—</div>
-    <div class="hdr-vals" id="hdr-vals">—</div>
+    <div class="hdr-settings-label">Current Settings</div>
+    <div class="hdr-settings" id="hdr-settings">—</div>
   </div>
   <div class="hdr-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
+    <button class="reset-btn" onclick="resetDefaults()">Reset to Defaults</button>
     <button class="faq-btn" onclick="openFaq()">?</button>
   </div>
 </div>
@@ -1048,10 +1346,10 @@ body{
     <line x1="750" y1="0" x2="750" y2="108" stroke="#162030" stroke-width="0.5"/>
     <line x1="900" y1="0" x2="900" y2="108" stroke="#162030" stroke-width="0.5"/>
     <line x1="1050" y1="0" x2="1050" y2="108" stroke="#162030" stroke-width="0.5"/>
-    <!-- Oscilloscope waveform (teal) -->
-    <polyline points="0,54 30,54 38,28 46,80 54,16 62,92 70,38 78,70 86,54 120,54" stroke="#00C8C0" stroke-width="1.5" fill="none" opacity="0.7" filter="url(#glow-teal)"/>
-    <!-- Neural curve (purple) -->
-    <path d="M120,54 C180,54 195,8 240,8 C285,8 300,100 345,100 C390,100 405,8 450,8 C495,8 510,100 555,100 C600,100 615,54 1200,54" stroke="#8B5CF6" stroke-width="1.8" fill="none" opacity="0.5" filter="url(#glow-purple)"/>
+    <!-- Oscilloscope waveform (teal) — snapped to grid y=18..90 -->
+    <polyline points="0,54 30,54 38,29 46,79 54,18 62,90 70,38 78,70 86,54 120,54" stroke="#00DDD4" stroke-width="1.5" fill="none" opacity="0.7" filter="url(#glow-teal)"/>
+    <!-- Sine wave (purple) — full width, fits within y=18..90 -->
+    <path d="M120,54 C165,54 180,18 225,18 C270,18 285,90 330,90 C375,90 390,18 435,18 C480,18 495,90 540,90 C585,90 600,54 660,54 C720,54 735,18 780,18 C825,18 840,90 885,90 C930,90 945,18 990,18 C1035,18 1050,90 1095,90 C1140,90 1155,54 1200,54" stroke="#8B5CF6" stroke-width="1.8" fill="none" opacity="0.5" filter="url(#glow-purple)"/>
     <!-- Scan line glow -->
     <rect x="0" y="51" width="1200" height="6" fill="url(#scan-h)"/>
     <!-- Intersection accent dots -->
@@ -1064,7 +1362,6 @@ body{
     <line x1="0" y1="0" x2="0" y2="108" stroke="#00C8C0" stroke-width="2" opacity="0.3"/>
   </svg>
   <div class="hero-left">
-    <div class="hero-brand">control</div>
     <div class="hero-tagline">dial it in.</div>
   </div>
 </div>
@@ -1087,6 +1384,8 @@ body{
           <div class="fader-ticks" id="ticks-intensity"></div>
           <div class="fader-track" id="ft-intensity">
             <div class="fader-fill" id="ff-intensity"></div>
+            <div class="fader-ghost" id="fg-intensity"></div>
+            <div class="pickup-label" id="pl-intensity">MOVE TO SYNC</div>
             <div class="fader-thumb" id="fth-intensity"><div class="thumb-center"></div></div>
           </div>
         </div>
@@ -1112,7 +1411,7 @@ body{
     <!-- CHANNEL T2: CONFIDENCE -->
     <div class="ch t2">
       <div class="ch-accent"></div>
-      <div class="ch-hdr-row"><span class="ch-id">Track 2 — CONF</span><button class="ch-pwr" id="cpwr-t2" onclick="toggleTrack('t2')" title="Enable / mute track">◉</button></div>
+      <div class="ch-hdr-row"><span class="ch-id">Track 2 — CONFIDENCE</span><button class="ch-pwr" id="cpwr-t2" onclick="toggleTrack('t2')" title="Enable / mute track">◉</button></div>
 
       <div class="fader-wrap">
         <div class="fader-lbl">CONFIDENCE</div>
@@ -1120,6 +1419,8 @@ body{
           <div class="fader-ticks" id="ticks-certainty"></div>
           <div class="fader-track" id="ft-certainty">
             <div class="fader-fill" id="ff-certainty"></div>
+            <div class="fader-ghost" id="fg-certainty"></div>
+            <div class="pickup-label" id="pl-certainty">MOVE TO SYNC</div>
             <div class="fader-thumb" id="fth-certainty"><div class="thumb-center"></div></div>
           </div>
         </div>
@@ -1177,6 +1478,7 @@ body{
           <input class="preset-input" id="preset-input" type="text" placeholder="name this state…" maxlength="40">
           <button class="preset-save-btn" onclick="savePreset()">SAVE</button>
         </div>
+        <button class="abort-btn" id="abort-btn" onclick="abortRun()">&#9632; ABORT</button>
       </div>
       <div class="preset-list" id="preset-list"><span class="preset-empty">no presets saved</span></div>
     </div>
@@ -1203,12 +1505,6 @@ body{
       </div>
     </div>
 
-    <!-- INFO BOX -->
-    <div class="info-wrap">
-      <div class="info-label" id="info-label">hover any control</div>
-      <div class="info-text" id="info-text">Move a fader, knob, or button to see what it does.</div>
-    </div>
-
     <!-- RUN LOG -->
     <div class="history-wrap">
       <div class="history-hd-row">
@@ -1233,6 +1529,8 @@ body{
           <div class="fader-ticks" id="ticks-scope"></div>
           <div class="fader-track" id="ft-scope">
             <div class="fader-fill" id="ff-scope"></div>
+            <div class="fader-ghost" id="fg-scope"></div>
+            <div class="pickup-label" id="pl-scope">MOVE TO SYNC</div>
             <div class="fader-thumb" id="fth-scope"><div class="thumb-center"></div></div>
           </div>
         </div>
@@ -1266,6 +1564,8 @@ body{
           <div class="fader-ticks" id="ticks-room"></div>
           <div class="fader-track" id="ft-room">
             <div class="fader-fill" id="ff-room"></div>
+            <div class="fader-ghost" id="fg-room"></div>
+            <div class="pickup-label" id="pl-room">MOVE TO SYNC</div>
             <div class="fader-thumb" id="fth-room"><div class="thumb-center"></div></div>
           </div>
         </div>
@@ -1434,6 +1734,21 @@ body{
     </div>
 
     <div class="faq-s">
+      <div class="faq-s-title">keyboard shortcuts</div>
+      <div class="faq-track">
+        <div class="faq-track-desc">
+          <strong style="color:var(--text)">Space</strong> — Abort running Claude process<br>
+          <strong style="color:var(--text)">1 / 2 / 3 / 4</strong> — Mute / unmute Track 1 – 4<br>
+          <strong style="color:var(--text)">R</strong> — Reset all faders and knobs to 0.50<br>
+          <strong style="color:var(--text)">T</strong> — Toggle light / dark theme<br>
+          <strong style="color:var(--text)">?</strong> — Open this panel<br>
+          <strong style="color:var(--text)">Esc</strong> — Close this panel
+        </div>
+      </div>
+      <p class="faq-p" style="margin-top:8px">Shortcuts are suppressed when the preset name field is focused.</p>
+    </div>
+
+    <div class="faq-s">
       <div class="faq-s-title">practical combos</div>
       <div class="faq-track">
         <div class="faq-track-name">Analyze before touching code</div>
@@ -1454,7 +1769,7 @@ body{
 </div>
 
 <script>
-const THUMB_H = 24;
+const THUMB_H = 28;
 const FADERS = {
   intensity: {fill:'ff-intensity', thumb:'fth-intensity', val:'fv-intensity', track:'ft-intensity'},
   certainty: {fill:'ff-certainty', thumb:'fth-certainty', val:'fv-certainty', track:'ft-certainty'},
@@ -1473,7 +1788,6 @@ const BADGE_C  = {EXPLORE:'#00A8A0', FIX:'#8B5CF6', BUILD:'#00C8C0'};
 const PILL_C   = ['#00C8C0','#8B5CF6','#00A0A8','#6040C8'];
 
 let isDragging  = false;
-let lastState   = {};
 const activeTimers = {};
 const prevVals  = {};  // tracks last seen value per field to detect real changes
 
@@ -1504,16 +1818,9 @@ const INFO = {
   VOICE:      ['VOICE',      'Output style. DIRECT = no commentary. STUDIO = clean + measured. OPEN = thinks out loud.'],
 };
 
-function showInfo(key) {
-  const entry = INFO[key];
-  if (!entry) return;
-  document.getElementById('info-label').textContent = entry[0];
-  document.getElementById('info-text').textContent  = entry[1];
-}
-function clearInfo() {
-  document.getElementById('info-label').textContent = 'hover any control';
-  document.getElementById('info-text').textContent  = 'Move a fader, knob, or button to see what it does.';
-}
+function showInfo(key) {}
+function clearInfo()   {}
+let lastState = {};
 
 function buildPromptPreview(s) {
   const i=s.intensity??0.5, d=s.depth??0.5, c=s.certainty??0.5, r=s.risk??0.5;
@@ -1579,7 +1886,6 @@ function buildTicks(containerId) {
   ];
   c.innerHTML = ticks.map(t =>
     `<div class="tick">
-      <span class="tick-lbl">${t.lbl}</span>
       <div class="tick-line${t.major?' major':''}" style="width:${t.major?6:4}px"></div>
     </div>`
   ).join('');
@@ -1658,21 +1964,28 @@ function setPill(id, text, color) {
 }
 function applyState(s) {
   lastState = s;
-  Object.keys(FADERS).forEach(f => setFader(f, s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5)));
+  Object.keys(FADERS).forEach(f => {
+    const v = s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5);
+    if (checkPickup(f, v)) return; // blocked — physical hasn't reached software position yet
+    setFader(f, v);
+  });
   Object.keys(KNOBS).forEach(f  => setKnob(f,  s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5)));
   METERS.forEach(f => setMeter(f, s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5)));
   setButtons('mode',   s.mode);
   setButtons('stance', s.stance);
   setButtons('filter', s.filter);
   setButtons('voice',  s.voice);
-  const col = BADGE_C[s.mode] || '#C8922A';
-  const badge = document.getElementById('hdr-badge');
-  badge.textContent = s.mode||'—';
-  badge.style.color = col;
-  badge.style.background = col+'22';
-  badge.style.borderLeftColor = col;
-  document.getElementById('hdr-vals').textContent =
-    `I ${(s.intensity??0).toFixed(2)}  D ${(s.depth??0).toFixed(2)}  C ${(s.certainty??0).toFixed(2)}  R ${(s.risk??0).toFixed(2)}`;
+  const parts = [];
+  if (s.mode)   parts.push(`Mode: ${s.mode}`);
+  if (s.stance) parts.push(`Stance: ${s.stance}`);
+  if (s.filter) parts.push(`Filter: ${s.filter}`);
+  if (s.voice)  parts.push(`Voice: ${s.voice}`);
+  parts.push(`Effort: ${(s.intensity??0.5).toFixed(2)}`);
+  parts.push(`Confidence: ${(s.certainty??0.5).toFixed(2)}`);
+  parts.push(`Scope: ${(s.scope??0.5).toFixed(2)}`);
+  parts.push(`Verbosity: ${(s.room??0.5).toFixed(2)}`);
+  const settingsEl = document.getElementById('hdr-settings');
+  if (settingsEl) settingsEl.textContent = parts.length ? parts.join('  ·  ') : 'All defaults — baseline';
   setPill('pill-mode',   s.mode  ||'—', PILL_C[0]);
   setPill('pill-stance', s.stance||'—', PILL_C[1]);
   setPill('pill-filter', s.filter||'—', PILL_C[2]);
@@ -1921,35 +2234,33 @@ function copyResp(i, e) {
 function renderHistory() {
   const el = document.getElementById('history');
   if (!history.length) { el.innerHTML='<div class="history-empty">no runs yet</div>'; return; }
-  el.innerHTML = history.map((r,i) => `
+  el.innerHTML = history.slice(0,5).map((r,i) => {
+    const modeTag = r.mode ? `<span class="hc-mode">${esc(r.mode)}</span>` : '';
+    const stanceTag = r.stance ? `<span class="hc-mode" style="background:transparent;color:var(--text3);border-color:var(--border2)">${esc(r.stance)}</span>` : '';
+    return `
     <div class="hc" id="hc-${i}" onclick="toggleCard(${i})">
       <div class="hc-top">
         <span class="hc-time">${esc(r.t)}</span>
-        <span class="hc-mode">${esc(r.mode)}</span>
-        <span class="hc-peek">I${r.intensity} D${r.depth} C${r.certainty} R${r.risk}</span>
+        ${modeTag}${stanceTag}
         <span class="hc-chevron">▼</span>
       </div>
       <div class="hc-task">${esc(r.task)}</div>
-      <div class="hc-preview">${esc(r.resp.slice(0,140))}${r.resp.length>140?'…':''}</div>
       <div class="hc-body">
         <div class="hc-state-grid">
-          <div class="hc-si"><div class="hc-si-lbl">MODE</div><div class="hc-si-val">${esc(r.mode)}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">STANCE</div><div class="hc-si-val">${esc(r.stance)}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">FILTER</div><div class="hc-si-val">${esc(r.filter)}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">VOICE</div><div class="hc-si-val">${esc(r.voice)}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">EFFORT</div><div class="hc-si-val">${r.intensity}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">THINK TIME</div><div class="hc-si-val">${r.depth}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">CONFIDENCE</div><div class="hc-si-val">${r.certainty}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">BOLDNESS</div><div class="hc-si-val">${r.risk}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">ZOOM LEVEL</div><div class="hc-si-val">${r.scope}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">CONTEXT SIZE</div><div class="hc-si-val">${r.bandwidth}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">VERBOSITY</div><div class="hc-si-val">${r.room}</div></div>
-          <div class="hc-si"><div class="hc-si-lbl">MEMORY</div><div class="hc-si-val">${r.decay}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Mode</div><div class="hc-si-val">${esc(r.mode)||'—'}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Stance</div><div class="hc-si-val">${esc(r.stance)||'—'}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Filter</div><div class="hc-si-val">${esc(r.filter)||'—'}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Voice</div><div class="hc-si-val">${esc(r.voice)||'—'}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Effort</div><div class="hc-si-val">${r.intensity}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Think Time</div><div class="hc-si-val">${r.depth}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Confidence</div><div class="hc-si-val">${r.certainty}</div></div>
+          <div class="hc-si"><div class="hc-si-lbl">Boldness</div><div class="hc-si-val">${r.risk}</div></div>
         </div>
         <div class="hc-full">${esc(r.resp)}</div>
         <div class="hc-actions"><button class="hc-copy" onclick="copyResp(${i},event)">Copy</button></div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── PRESETS ───────────────────────────────────────────────────────
@@ -1977,6 +2288,16 @@ async function savePreset() {
   const d = await r.json();
   document.getElementById('preset-input').value = '';
   loadPresets();
+}
+async function abortRun() {
+  const btn = document.getElementById('abort-btn');
+  btn.classList.add('firing');
+  btn.textContent = '■ ABORTING…';
+  await fetch('/abort', {method:'POST'});
+  setTimeout(() => {
+    btn.classList.remove('firing');
+    btn.innerHTML = '&#9632; ABORT';
+  }, 600);
 }
 async function applyPreset(name) {
   await fetch('/presets/load', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
@@ -2135,10 +2456,111 @@ async function launchTask() {
 launchBtn.addEventListener('click', launchTask);
 launchInput.addEventListener('keydown', e => { if (e.key === 'Enter') launchTask(); });
 
+// ── PICKUP MODE (soft takeover) ───────────────────────────────────
+// pickupMode[field] = { targetVal, physicalVal, direction }
+const pickupMode = {};
+const PICKUP_TARGET = 0.5;
+const PICKUP_THRESHOLD = 0.025; // within 2.5% = locked in
+
+function setPickupGhost(field, physVal) {
+  const trackEl = document.getElementById('ft-'+field);
+  const ghostEl = document.getElementById('fg-'+field);
+  const labelEl = document.getElementById('pl-'+field);
+  if (!trackEl || !ghostEl) return;
+  const r = getRange('ft-'+field);
+  ghostEl.style.bottom = (physVal * r) + 'px';
+  ghostEl.classList.add('active');
+  trackEl.classList.add('pickup');
+  if (labelEl) labelEl.classList.add('active');
+}
+
+function clearPickup(field) {
+  const trackEl = document.getElementById('ft-'+field);
+  const ghostEl = document.getElementById('fg-'+field);
+  const labelEl = document.getElementById('pl-'+field);
+  if (ghostEl) ghostEl.classList.remove('active');
+  if (trackEl) trackEl.classList.remove('pickup');
+  if (labelEl) labelEl.classList.remove('active');
+  delete pickupMode[field];
+}
+
+function checkPickup(field, incomingVal) {
+  const pm = pickupMode[field];
+  if (!pm) return false; // not in pickup mode
+  // Update ghost to show physical position
+  setPickupGhost(field, incomingVal);
+  // Check if physical has crossed or reached target
+  const crossed = pm.direction === 'down'
+    ? incomingVal <= pm.targetVal + PICKUP_THRESHOLD
+    : incomingVal >= pm.targetVal - PICKUP_THRESHOLD;
+  if (crossed) {
+    clearPickup(field);
+    return false; // allow value through — it's now in sync
+  }
+  return true; // still in pickup, block this value
+}
+
+// ── RESET TO DEFAULTS ─────────────────────────────────────────────
+async function resetDefaults() {
+  const TARGET = PICKUP_TARGET;
+  // Capture physical positions before reset & set up pickup mode
+  Object.keys(FADERS).forEach(field => {
+    const curVal = parseFloat(document.getElementById(FADERS[field].val).textContent) || 0.5;
+    if (Math.abs(curVal - TARGET) > PICKUP_THRESHOLD) {
+      pickupMode[field] = {
+        targetVal: TARGET,
+        physicalVal: curVal,
+        direction: curVal > TARGET ? 'down' : 'up'
+      };
+      setPickupGhost(field, curVal);
+    }
+  });
+  // Reset software state immediately
+  const defaults = {
+    intensity:TARGET, depth:TARGET, certainty:TARGET, risk:TARGET,
+    scope:TARGET, bandwidth:TARGET, room:TARGET, decay:TARGET,
+    mode:'', stance:'', filter:'', voice:'',
+    t1_on:true, t2_on:true, t3_on:true, t4_on:true
+  };
+  await fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(defaults)});
+  // Snap software faders to target immediately
+  Object.keys(FADERS).forEach(field => {
+    if (pickupMode[field]) setFader(field, TARGET);
+  });
+}
+
 // ── FAQ ───────────────────────────────────────────────────────────
 function openFaq()  { document.getElementById('faq-overlay').classList.add('open'); document.getElementById('faq-panel').classList.add('open'); }
 function closeFaq() { document.getElementById('faq-overlay').classList.remove('open'); document.getElementById('faq-panel').classList.remove('open'); }
-document.addEventListener('keydown', e => { if (e.key==='Escape') closeFaq(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeFaq(); return; }
+  // Suppress shortcuts when typing in an input
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  switch (e.key) {
+    case ' ':
+      e.preventDefault();
+      abortRun();
+      break;
+    case '1': e.preventDefault(); toggleTrack('t1'); break;
+    case '2': e.preventDefault(); toggleTrack('t2'); break;
+    case '3': e.preventDefault(); toggleTrack('t3'); break;
+    case '4': e.preventDefault(); toggleTrack('t4'); break;
+    case 'r': case 'R': resetDefaults(); break;
+    case 't': case 'T': toggleTheme(); break;
+    case '?': openFaq(); break;
+  }
+});
+
+// ── Theme toggle ──────────────────────────────────────────
+(function initTheme() {
+  const saved = localStorage.getItem('gain_theme');
+  if (saved === 'light') document.body.classList.add('light');
+})();
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('gain_theme', isLight ? 'light' : 'dark');
+}
 </script>
 </body>
 </html>"""
