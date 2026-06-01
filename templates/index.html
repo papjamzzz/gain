@@ -79,27 +79,59 @@
       max-width: 380px;
     }
 
-    .scroll-hint {
+    .watch-btn {
       position: absolute;
-      bottom: 18px; right: 28px;
+      bottom: 28px; right: 28px;
       z-index: 10;
-      color: rgba(255,255,255,0.3);
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: .12em;
-      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0,0,0,.45);
+      border: 1px solid rgba(0,220,212,.4);
+      border-radius: 4px;
+      padding: 14px 22px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: all .2s;
+      text-decoration: none;
+    }
+    .watch-btn:hover {
+      background: rgba(0,220,212,.12);
+      border-color: rgba(0,220,212,.8);
+      box-shadow: 0 0 28px rgba(0,220,212,.25);
+    }
+    .watch-play {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(0,220,212,.2);
+      border: 1.5px solid rgba(0,220,212,.7);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .watch-play svg { margin-left: 2px; }
+    .watch-text {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      transition: color .2s;
+      align-items: flex-start;
+      gap: 2px;
     }
-    .scroll-hint:hover { color: rgba(255,255,255,0.6); }
-    .scroll-hint svg { animation: bounce 2s infinite; }
-    @keyframes bounce {
-      0%,100% { transform: translateY(0); }
-      50% { transform: translateY(4px); }
+    .watch-label {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    .watch-sub {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .1em;
+      color: rgba(0,220,212,.7);
+      text-transform: uppercase;
+    }
+    @media (max-width: 600px) {
+      .watch-btn { bottom: 80px; right: 12px; padding: 10px 16px; }
+      .watch-label { font-size: 13px; }
     }
 
     /* ── VIDEO SECTION ── */
@@ -252,11 +284,16 @@
     </video>
     <div class="overlay"></div>
     <div class="brand">gain</div>
-    <div class="scroll-hint" onclick="document.querySelector('.video-section').scrollIntoView({behavior:'smooth'})">
-      Watch
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <path d="M7 2v10M3 8l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+    <div class="watch-btn" onclick="document.querySelector('.video-section').scrollIntoView({behavior:'smooth'})">
+      <div class="watch-play">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <polygon points="3,1 13,7 3,13" fill="rgba(0,220,212,1)"/>
+        </svg>
+      </div>
+      <div class="watch-text">
+        <span class="watch-label">Watch Now</span>
+        <span class="watch-sub">See it in action</span>
+      </div>
     </div>
   </section>
 
