@@ -130,22 +130,83 @@ def _execute_tool(name: str, inputs: dict) -> str:
 
 # ── State ─────────────────────────────────────────────────────────────────────
 
-def read_state() -> dict:
+DEFAULT_STATE = {
+    "mode": "BUILD", "intensity": 0.5, "depth": 0.5,
+    "certainty": 0.5, "risk": 0.5, "stance": "GUIDE",
+    "scope": 0.5, "bandwidth": 0.5, "filter": "MODULE",
+    "room": 0.5, "decay": 0.5, "voice": "STUDIO",
+    "t1_on": True, "t2_on": True, "t3_on": True, "t4_on": True,
+}
+
+def _sb_headers(token=None):
+    h = {"apikey": SUPABASE_SERVICE, "Content-Type": "application/json"}
+    if token:
+        h["Authorization"] = f"Bearer {token}"
+    else:
+        h["Authorization"] = f"Bearer {SUPABASE_SERVICE}"
+    return h
+
+def _get_user_id(token: str) -> str | None:
+    """Validate token and return user_id."""
+    if not token or not SUPABASE_URL:
+        return None
+    try:
+        import requests as _req
+        r = _req.get(f"{SUPABASE_URL}/auth/v1/user",
+                     headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON},
+                     timeout=4)
+        if r.status_code == 200:
+            return r.json().get("id")
+    except Exception:
+        pass
+    return None
+
+def _token_from_request() -> str:
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return auth[7:]
+    return ""
+
+def read_state(user_id: str = None) -> dict:
+    """Read state from Supabase if user_id given, else fall back to local file."""
+    if user_id and SUPABASE_URL:
+        try:
+            import requests as _req
+            r = _req.get(
+                f"{SUPABASE_URL}/rest/v1/user_state?user_id=eq.{user_id}&select=state",
+                headers=_sb_headers(), timeout=4)
+            if r.status_code == 200:
+                rows = r.json()
+                if rows:
+                    return {**DEFAULT_STATE, **rows[0]["state"]}
+        except Exception:
+            pass
+    # Local fallback
     try:
         return json.loads(STATE_FILE.read_text())
     except Exception:
-        return {
-            "mode": "BUILD", "intensity": 0.5, "depth": 0.5,
-            "certainty": 0.5, "risk": 0.5, "stance": "GUIDE",
-            "scope": 0.5, "bandwidth": 0.5, "filter": "MODULE",
-            "room": 0.5, "decay": 0.5, "voice": "STUDIO",
-        }
+        return DEFAULT_STATE.copy()
 
-def write_state(state: dict) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = STATE_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2) + "\n")
-    tmp.replace(STATE_FILE)
+def write_state(state: dict, user_id: str = None) -> None:
+    """Write state to Supabase if user_id given, else write local file."""
+    if user_id and SUPABASE_URL:
+        try:
+            import requests as _req
+            _req.post(
+                f"{SUPABASE_URL}/rest/v1/user_state",
+                headers={**_sb_headers(), "Prefer": "resolution=merge-duplicates"},
+                json={"user_id": user_id, "state": state, "updated_at": "now()"},
+                timeout=4)
+        except Exception:
+            pass
+    # Always write local file as backup
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=2) + "\n")
+        tmp.replace(STATE_FILE)
+    except Exception:
+        pass
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -226,14 +287,16 @@ def index():
 
 @app.route("/stream")
 def stream():
+    token   = request.args.get("token", "")
+    user_id = _get_user_id(token) if token else None
     def generate():
         last = {}
         while True:
-            state = read_state()
+            state = read_state(user_id)
             if state != last:
                 last = state.copy()
                 yield f"data: {json.dumps(state)}\n\n"
-            time.sleep(0.05)
+            time.sleep(0.3)
     return Response(
         generate(),
         mimetype="text/event-stream",
@@ -242,10 +305,12 @@ def stream():
 
 @app.route("/set", methods=["POST"])
 def set_state():
-    data = request.get_json()
-    state = read_state()
+    token   = _token_from_request()
+    user_id = _get_user_id(token) if token else None
+    data    = request.get_json()
+    state   = read_state(user_id)
     state.update(data)
-    write_state(state)
+    write_state(state, user_id)
     return jsonify({"ok": True})
 
 @app.route("/run", methods=["POST"])
@@ -255,6 +320,8 @@ def run_task():
     if not task:
         return jsonify({"error": "No task provided"}), 400
     api_key = os.environ.get("ANTHROPIC_API_KEY")
+    token   = _token_from_request()
+    user_id = _get_user_id(token) if token else None
 
     def generate():
         if not _anthropic:
@@ -263,7 +330,7 @@ def run_task():
         if not api_key:
             yield f"data: {json.dumps({'error': 'ANTHROPIC_API_KEY not set'})}\n\n"
             return
-        state  = read_state()
+        state  = read_state(user_id)
         system = _build_prompt(state)
         try:
             client = _anthropic.Anthropic(api_key=api_key)
@@ -2023,7 +2090,8 @@ function toggleTrack(t) {
   set(key, lastState[key] === false ? true : false);
 }
 
-const es = new EventSource('/stream');
+const _tok = localStorage.getItem('sb-access-token') || '';
+const es = new EventSource('/stream' + (_tok ? '?token=' + encodeURIComponent(_tok) : ''));
 es.onmessage = e => { if (!isDragging) applyState(JSON.parse(e.data)); };
 es.onerror   = () => { document.getElementById('hdr-vals').textContent = 'reconnecting…'; };
 
