@@ -1,13 +1,17 @@
 from flask import Flask, render_template, jsonify, request
 from dotenv import load_dotenv
-import os, json, requests
+import os, json, requests, logging
 from pathlib import Path
 from datetime import datetime
 
 load_dotenv()
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
-WAITLIST_FILE = Path(__file__).parent / 'data' / 'waitlist.json'
+WAITLIST_FILE  = Path(__file__).parent / 'data' / 'waitlist.json'
+AUDIENCE_ID    = '7ed2a7d8-e897-454f-937b-9279f67fd845'
+NOTIFY_EMAIL   = 'jeremiahstephensmith@gmail.com'
 
 def load_waitlist():
     if WAITLIST_FILE.exists():
@@ -18,42 +22,68 @@ def save_waitlist(entries):
     WAITLIST_FILE.parent.mkdir(exist_ok=True)
     WAITLIST_FILE.write_text(json.dumps(entries, indent=2))
 
+def add_to_resend(email: str, resend_key: str):
+    headers = {
+        'Authorization': f'Bearer {resend_key}',
+        'Content-Type': 'application/json'
+    }
+    # Add to Audience
+    r = requests.post(
+        f'https://api.resend.com/audiences/{AUDIENCE_ID}/contacts',
+        headers=headers,
+        json={'email': email, 'unsubscribed': False},
+        timeout=8
+    )
+    if r.status_code not in (200, 201):
+        log.error(f'[resend] audience add failed {r.status_code}: {r.text}')
+    else:
+        log.info(f'[resend] contact added: {email}')
+
+    # Notify inbox
+    r2 = requests.post(
+        'https://api.resend.com/emails',
+        headers=headers,
+        json={
+            'from': 'Gain <onboarding@resend.dev>',
+            'to': [NOTIFY_EMAIL],
+            'subject': f'Gain waitlist: {email}',
+            'html': f'<p>New signup: <strong>{email}</strong></p><p>{datetime.utcnow().isoformat()}</p>'
+        },
+        timeout=8
+    )
+    if r2.status_code not in (200, 201):
+        log.error(f'[resend] notify failed {r2.status_code}: {r2.text}')
+    else:
+        log.info(f'[resend] notification sent for: {email}')
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/waitlist', methods=['POST'])
 def waitlist():
-    data = request.get_json(silent=True) or {}
+    data  = request.get_json(silent=True) or {}
     email = (data.get('email') or '').strip().lower()
     if not email or '@' not in email:
         return jsonify({'error': 'invalid email'}), 400
+
     entries = load_waitlist()
     if any(e['email'] == email for e in entries):
         return jsonify({'status': 'already_registered'})
+
     entries.append({'email': email, 'joined': datetime.utcnow().isoformat()})
     save_waitlist(entries)
-    # Forward to your inbox via Resend
-    resend_key = os.getenv('RESEND_API_KEY', '')
+    log.info(f'[waitlist] new signup: {email}')
+
+    resend_key = os.getenv('RESEND_API_KEY', '').strip()
     if resend_key:
         try:
-            # Add to Resend Audience
-            requests.post('https://api.resend.com/audiences/7ed2a7d8-e897-454f-937b-9279f67fd845/contacts', headers={
-                'Authorization': f'Bearer {resend_key}',
-                'Content-Type': 'application/json'
-            }, json={'email': email, 'unsubscribed': False}, timeout=5)
-            # Notify inbox
-            requests.post('https://api.resend.com/emails', headers={
-                'Authorization': f'Bearer {resend_key}',
-                'Content-Type': 'application/json'
-            }, json={
-                'from': 'Gain <noreply@creativekonsoles.com>',
-                'to': ['jeremiahstephensmith@gmail.com'],
-                'subject': f'Gain waitlist: {email}',
-                'html': f'<p>New signup: <strong>{email}</strong></p><p>{datetime.utcnow().isoformat()}</p>'
-            }, timeout=5)
-        except Exception:
-            pass
+            add_to_resend(email, resend_key)
+        except Exception as e:
+            log.error(f'[resend] exception: {e}')
+    else:
+        log.warning('[resend] RESEND_API_KEY not set — skipping')
+
     return jsonify({'status': 'ok'})
 
 @app.route('/waitlist/view')
@@ -81,7 +111,8 @@ def waitlist_view():
 
 @app.route('/api/status')
 def status():
-    return jsonify({'status': 'ok', 'project': 'gain'})
+    key_set = bool(os.getenv('RESEND_API_KEY', '').strip())
+    return jsonify({'status': 'ok', 'project': 'gain', 'resend_key_set': key_set})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5567))
