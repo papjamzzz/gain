@@ -150,50 +150,9 @@
 
   <div class="bottom">
     <div class="form-row">
-      <input class="email-input" id="email" type="email" placeholder="your email">
-      <button class="join-btn" id="join-btn" onclick="joinWaitlist()">GET EARLY ACCESS</button>
+      <a class="join-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSd9JMG3NgGH7cD9NcQgW9-vwugxdDClhJ2cTy6w7bYmDeqf-Q/viewform" target="_blank" style="text-decoration:none;display:inline-block;">GET EARLY ACCESS</a>
     </div>
-    <div class="status-msg" id="status"></div>
   </div>
-
-  <script>
-    async function joinWaitlist() {
-      const email = document.getElementById('email').value.trim();
-      const btn   = document.getElementById('join-btn');
-      const msg   = document.getElementById('status');
-      if (!email || !email.includes('@')) {
-        msg.textContent = 'enter a valid email.';
-        msg.className   = 'status-msg err';
-        return;
-      }
-      btn.disabled = true;
-      btn.textContent = '···';
-      try {
-        const r = await fetch('/waitlist', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({email})
-        });
-        const d = await r.json();
-        if (d.status === 'ok' || d.status === 'already_registered') {
-          msg.textContent = "you're on the list.";
-          msg.className   = 'status-msg';
-          document.getElementById('email').value = '';
-          btn.textContent = '✓';
-        } else {
-          throw new Error(d.error || 'error');
-        }
-      } catch(e) {
-        msg.textContent = 'something went wrong. try again.';
-        msg.className   = 'status-msg err';
-        btn.disabled    = false;
-        btn.textContent = 'GET EARLY ACCESS';
-      }
-    }
-    document.getElementById('email').addEventListener('keydown', e => {
-      if (e.key === 'Enter') joinWaitlist();
-    });
-  </script>
 
 </body>
 </html>
