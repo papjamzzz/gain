@@ -50,6 +50,29 @@ def waitlist():
             pass
     return jsonify({'status': 'ok'})
 
+@app.route('/waitlist/view')
+def waitlist_view():
+    pw = request.args.get('pw', '')
+    if pw != os.getenv('ADMIN_PW', 'gain2026'):
+        return '<h2 style="font-family:sans-serif;padding:40px">Access denied. Add ?pw=yourpassword to the URL.</h2>', 403
+    entries = load_waitlist()
+    rows = ''.join(
+        f'<tr><td style="padding:8px 16px;border-bottom:1px solid #eee">{i+1}</td>'
+        f'<td style="padding:8px 16px;border-bottom:1px solid #eee">{e["email"]}</td>'
+        f'<td style="padding:8px 16px;border-bottom:1px solid #eee;color:#888">{e.get("joined","—")[:19].replace("T"," ")}</td></tr>'
+        for i, e in enumerate(entries)
+    )
+    return f'''<!DOCTYPE html><html><head><title>Gain Waitlist</title></head>
+<body style="font-family:sans-serif;max-width:600px;margin:60px auto;padding:0 20px">
+<h2 style="color:#00DDD4">Gain Waitlist — {len(entries)} signup{"s" if len(entries)!=1 else ""}</h2>
+<table style="width:100%;border-collapse:collapse;margin-top:20px">
+<thead><tr>
+  <th style="text-align:left;padding:8px 16px;background:#f5f5f5">#</th>
+  <th style="text-align:left;padding:8px 16px;background:#f5f5f5">Email</th>
+  <th style="text-align:left;padding:8px 16px;background:#f5f5f5">Joined</th>
+</tr></thead><tbody>{rows or "<tr><td colspan=3 style='padding:20px 16px;color:#888'>No signups yet.</td></tr>"}</tbody>
+</table></body></html>'''
+
 @app.route('/api/status')
 def status():
     return jsonify({'status': 'ok', 'project': 'gain'})
