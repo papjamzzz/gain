@@ -252,6 +252,15 @@
     </video>
     <div class="overlay"></div>
     <div class="brand">gain</div>
+
+    <div class="hero-bottom">
+      <div class="form-row">
+        <input class="email-input" id="emailInputHero" type="email" placeholder="your@email.com" autocomplete="email"/>
+        <button class="join-btn" onclick="joinWaitlist('emailInputHero','statusMsgHero')">GET EARLY ACCESS</button>
+      </div>
+      <div class="status-msg" id="statusMsgHero"></div>
+    </div>
+
     <div class="scroll-hint" onclick="document.querySelector('.video-section').scrollIntoView({behavior:'smooth'})">
       Learn More
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -287,9 +296,9 @@
   </section>
 
   <script>
-    async function joinWaitlist() {
-      const input = document.getElementById('emailInput');
-      const msg   = document.getElementById('statusMsg');
+    async function joinWaitlist(inputId='emailInput', msgId='statusMsg') {
+      const input = document.getElementById(inputId);
+      const msg   = document.getElementById(msgId);
       const email = input.value.trim();
       msg.className = 'status-msg';
       if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email.'; return; }
@@ -317,6 +326,9 @@
         msg.classList.add('err');
       }
     }
+    document.getElementById('emailInputHero').addEventListener('keydown', e => {
+      if (e.key === 'Enter') joinWaitlist('emailInputHero','statusMsgHero');
+    });
     document.getElementById('emailInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') joinWaitlist();
     });
