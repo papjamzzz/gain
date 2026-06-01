@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Gain — Sign In</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Abril+Fatface&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -251,22 +250,9 @@
   </div>
 
   <script>
-    const SUPABASE_URL  = '{{ supabase_url }}';
-    const SUPABASE_KEY  = '{{ supabase_anon_key }}';
-    const { createClient } = supabase;
-    const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // Check if already logged in
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session) window.location.href = '/app';
-    });
-
-    // Handle OAuth callback
-    sb.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        window.location.href = '/app';
-      }
-    });
+    const SB_URL = '{{ supabase_url }}';
+    const SB_KEY = '{{ supabase_anon_key }}';
+    const CALLBACK = window.location.origin + '/auth/callback';
 
     let isSignUp = false;
 
@@ -290,13 +276,9 @@
       el.className = 'status' + (type ? ' ' + type : '');
     }
 
-    async function signInGoogle() {
-      setStatus('Redirecting to Google…');
-      const { error } = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin + '/auth/callback' }
-      });
-      if (error) setStatus(error.message, 'err');
+    function signInGoogle() {
+      const url = `${SB_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(CALLBACK)}`;
+      window.location.href = url;
     }
 
     async function signInPassword() {
@@ -305,12 +287,31 @@
       if (!email || !password) { setStatus('Enter email and password.', 'err'); return; }
       const btn = document.getElementById('pw-btn');
       btn.disabled = true;
-      setStatus('Signing in…');
-      const fn = isSignUp ? sb.auth.signUp.bind(sb.auth) : sb.auth.signInWithPassword.bind(sb.auth);
-      const { error } = await fn({ email, password });
+      setStatus(isSignUp ? 'Creating account…' : 'Signing in…');
+      const endpoint = isSignUp
+        ? `${SB_URL}/auth/v1/signup`
+        : `${SB_URL}/auth/v1/token?grant_type=password`;
+      try {
+        const res  = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (data.error || data.error_description || data.msg) {
+          setStatus(data.error_description || data.msg || data.error, 'err');
+        } else if (isSignUp) {
+          setStatus('Check your email to confirm your account.', 'ok');
+        } else if (data.access_token) {
+          // Store token and go to app
+          localStorage.setItem('sb-access-token', data.access_token);
+          localStorage.setItem('sb-refresh-token', data.refresh_token);
+          window.location.href = '/app';
+        }
+      } catch(e) {
+        setStatus('Network error. Try again.', 'err');
+      }
       btn.disabled = false;
-      if (error) { setStatus(error.message, 'err'); return; }
-      if (isSignUp) setStatus('Check your email to confirm your account.', 'ok');
     }
 
     async function sendMagicLink() {
@@ -319,13 +320,19 @@
       const btn = document.getElementById('magic-btn');
       btn.disabled = true;
       setStatus('Sending…');
-      const { error } = await sb.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin + '/auth/callback' }
-      });
+      try {
+        const res  = await fetch(`${SB_URL}/auth/v1/otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY },
+          body: JSON.stringify({ email, options: { emailRedirectTo: CALLBACK } })
+        });
+        const data = await res.json();
+        if (data.error) { setStatus(data.error, 'err'); }
+        else             { setStatus('Magic link sent. Check your inbox.', 'ok'); }
+      } catch(e) {
+        setStatus('Network error. Try again.', 'err');
+      }
       btn.disabled = false;
-      if (error) { setStatus(error.message, 'err'); return; }
-      setStatus('Magic link sent. Check your inbox.', 'ok');
     }
   </script>
 </body>

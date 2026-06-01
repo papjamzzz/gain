@@ -193,22 +193,29 @@ def login():
 
 @app.route("/auth/callback")
 def auth_callback():
-    # Supabase handles the token exchange client-side via JS
-    # This route just serves a redirect page that picks up the session
-    return """<!DOCTYPE html><html><head>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    # Parse token from hash fragment client-side, store in localStorage, redirect to /app
+    return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{{background:#000;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;font-size:13px;letter-spacing:.1em}}</style>
+</head><body>SIGNING IN…
 <script>
-const sb = supabase.createClient('""" + SUPABASE_URL + """','""" + SUPABASE_ANON + """');
-sb.auth.onAuthStateChange((event, session) => {
-  if (session) window.location.href = '/app';
-  else window.location.href = '/login';
-});
-</script></head><body style="background:#000;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;font-size:13px;letter-spacing:.1em">
-SIGNING IN…</body></html>"""
+(function(){{
+  var hash = window.location.hash.substring(1);
+  var params = {{}};
+  hash.split('&').forEach(function(p){{ var kv=p.split('='); params[kv[0]]=decodeURIComponent(kv[1]||''); }});
+  if (params.access_token) {{
+    localStorage.setItem('sb-access-token', params.access_token);
+    localStorage.setItem('sb-refresh-token', params.refresh_token || '');
+    window.location.href = '/app';
+  }} else {{
+    window.location.href = '/login';
+  }}
+}})();
+</script></body></html>"""
 
 @app.route("/app")
-@require_auth
 def app_view():
+    # Auth is validated client-side via JS + token in localStorage
+    # API routes (/set, /run, /stream etc.) enforce server-side auth
     return HTML
 
 @app.route("/")
@@ -1297,9 +1304,11 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
     <div class="hdr-settings" id="hdr-settings">—</div>
   </div>
   <div class="hdr-right">
+    <span id="user-email" style="font-size:9px;letter-spacing:.08em;color:var(--text3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
     <button class="reset-btn" onclick="resetDefaults()">Reset to Defaults</button>
     <button class="faq-btn" onclick="openFaq()">?</button>
+    <button class="reset-btn" id="logout-btn" onclick="logout()" style="display:none">Sign Out</button>
   </div>
 </div>
 
@@ -2551,6 +2560,46 @@ document.addEventListener('keydown', e => {
     case '?': openFaq(); break;
   }
 });
+
+// ── Auth ──────────────────────────────────────────────────
+const SB_URL = '""" + SUPABASE_URL + """';
+const SB_KEY = '""" + SUPABASE_ANON + """';
+
+function getToken() { return localStorage.getItem('sb-access-token') || ''; }
+
+function logout() {
+  localStorage.removeItem('sb-access-token');
+  localStorage.removeItem('sb-refresh-token');
+  window.location.href = '/login';
+}
+
+(async function initAuth() {
+  if (!SB_URL) return; // local dev, no auth
+  const token = getToken();
+  if (!token) { window.location.href = '/login'; return; }
+  try {
+    const res = await fetch(SB_URL + '/auth/v1/user', {
+      headers: { 'Authorization': 'Bearer ' + token, 'apikey': SB_KEY }
+    });
+    if (!res.ok) { window.location.href = '/login'; return; }
+    const user = await res.json();
+    const emailEl = document.getElementById('user-email');
+    const logoutEl = document.getElementById('logout-btn');
+    if (emailEl) emailEl.textContent = user.email || '';
+    if (logoutEl) logoutEl.style.display = '';
+  } catch(e) { /* network error — allow through in dev */ }
+})();
+
+// Patch fetch to include auth token on local API calls
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(url, opts) {
+  const token = getToken();
+  if (token && typeof url === 'string' && (url.startsWith('/') || url.startsWith(window.location.origin))) {
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers, { 'Authorization': 'Bearer ' + token });
+  }
+  return _origFetch(url, opts);
+};
 
 // ── Theme toggle ──────────────────────────────────────────
 (function initTheme() {
