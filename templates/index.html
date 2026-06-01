@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#000000"/>
   <title>Gain — Dial in your AI</title>
   <meta name="description" content="A behavioral mixing board for AI. Same task. Different state. Measurably different output.">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-VPT05X5BC2"></script>
@@ -237,9 +240,65 @@
 
     /* ── MOBILE ── */
     @media (max-width: 600px) {
-      .hero-bottom { left: 12px; right: 12px; max-width: calc(100% - 24px); }
-      .form-row { flex-direction: column; }
-      .join-btn { width: 100%; }
+
+      /* Hero — center everything on mobile */
+      .hero-bottom {
+        left: 0; right: 0;
+        bottom: 80px;
+        max-width: 100%;
+        padding: 0 20px;
+        align-items: center;
+      }
+
+      .form-row {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .email-input {
+        height: 50px;
+        font-size: 16px; /* prevent iOS zoom */
+        text-align: center;
+      }
+
+      .join-btn {
+        width: 100%;
+        height: 50px;
+        font-size: 11px;
+      }
+
+      /* Scroll hint — smaller, centered bottom */
+      .scroll-hint {
+        font-size: 11px;
+        bottom: 16px;
+        right: 50%;
+        transform: translateX(50%);
+      }
+
+      /* Video section */
+      .video-section {
+        padding: 50px 16px;
+        gap: 16px;
+      }
+
+      .video-headline { font-size: 22px; }
+      .video-sub { font-size: 13px; }
+
+      /* Signup section */
+      .signup-section {
+        padding: 50px 16px 80px;
+        gap: 16px;
+      }
+
+      .signup-headline { font-size: 22px; }
+      .signup-sub { font-size: 13px; }
+
+      .status-msg { font-size: 12px; }
+    }
+
+    /* iOS safe area */
+    @supports (padding-bottom: env(safe-area-inset-bottom)) {
+      .signup-section { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
     }
   </style>
 </head>
