@@ -19,40 +19,43 @@
     body {
       background: #000;
       font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
       height: 100vh;
       overflow: hidden;
     }
 
-    /* ── VIDEO BACKGROUND ── */
     .bg-video {
-      position: fixed;
+      position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      min-width: 100vw;
-      min-height: 100vh;
+      min-width: 100%;
+      min-height: 100%;
       width: auto; height: auto;
       object-fit: cover;
       z-index: 0;
       opacity: .85;
     }
 
-    /* ── OVERLAY ── */
     .overlay {
-      position: fixed;
+      position: absolute;
       inset: 0;
       background: linear-gradient(
         to bottom,
         rgba(4,8,14,.55) 0%,
         rgba(4,8,14,.15) 40%,
         rgba(4,8,14,.15) 60%,
-        rgba(4,8,14,.75) 100%
+        rgba(4,8,14,.85) 100%
       );
       z-index: 1;
     }
 
-    /* ── BRAND ── */
     .brand {
-      position: fixed;
+      position: absolute;
       top: 24px; left: 28px;
       font-family: 'Abril Fatface', serif;
       font-size: 28px;
@@ -64,9 +67,8 @@
       z-index: 10;
     }
 
-    /* ── BOTTOM EMAIL FORM ── */
-    .bottom {
-      position: fixed;
+    .hero-bottom {
+      position: absolute;
       bottom: 18px; left: 14px;
       z-index: 10;
       display: flex;
@@ -75,18 +77,119 @@
       gap: 8px;
       width: 100%;
       max-width: 380px;
-      padding: 0;
+    }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 18px; right: 28px;
+      z-index: 10;
+      color: rgba(255,255,255,0.3);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: color .2s;
+    }
+    .scroll-hint:hover { color: rgba(255,255,255,0.6); }
+    .scroll-hint svg { animation: bounce 2s infinite; }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(4px); }
+    }
+
+    /* ── VIDEO SECTION ── */
+    .video-section {
+      background: #03070d;
+      padding: 80px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .video-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: rgba(0,220,212,.6);
+    }
+
+    .video-headline {
+      font-size: clamp(22px, 4vw, 36px);
+      font-weight: 800;
+      color: #D8EAF8;
+      text-align: center;
+      max-width: 600px;
+      line-height: 1.25;
+    }
+
+    .video-sub {
+      font-size: 14px;
+      color: rgba(180,210,230,.5);
+      text-align: center;
+      max-width: 500px;
+      line-height: 1.6;
+    }
+
+    .yt-wrap {
+      width: 100%;
+      max-width: 800px;
+      aspect-ratio: 16/9;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(0,220,212,.15);
+      box-shadow: 0 0 60px rgba(0,180,200,.08);
+      margin-top: 12px;
+    }
+
+    .yt-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* ── SIGNUP SECTION ── */
+    .signup-section {
+      background: #020508;
+      padding: 80px 20px 100px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      border-top: 1px solid rgba(0,220,212,.08);
+    }
+
+    .signup-headline {
+      font-size: clamp(20px, 3.5vw, 30px);
+      font-weight: 800;
+      color: #D8EAF8;
+      text-align: center;
+    }
+
+    .signup-sub {
+      font-size: 13px;
+      color: rgba(180,210,230,.45);
+      text-align: center;
+      max-width: 400px;
     }
 
     .form-row {
       display: flex;
       gap: 8px;
       width: 100%;
+      max-width: 420px;
     }
 
     .email-input {
       flex: 1;
-      height: 40px;
+      height: 44px;
       background: rgba(6,10,15,.8);
       border: 1px solid rgba(220,40,40,.4);
       border-radius: 3px;
@@ -102,8 +205,8 @@
     .email-input:focus { border-color: rgba(220,40,40,.8); }
 
     .join-btn {
-      height: 40px;
-      padding: 0 18px;
+      height: 44px;
+      padding: 0 20px;
       background: rgba(200,20,20,.85);
       border: 1px solid rgba(255,60,60,.7);
       border-radius: 3px;
@@ -127,40 +230,68 @@
       letter-spacing: .06em;
       color: #FF6060;
       min-height: 16px;
-      text-align: left;
+      text-align: center;
     }
+    .status-msg.ok { color: #00DDD4; }
     .status-msg.err { color: #FF4040; }
 
     /* ── MOBILE ── */
     @media (max-width: 600px) {
-      .bg-video { height: 100vh; width: auto; }
-      .bottom { left: 12px; right: 12px; max-width: calc(100% - 24px); bottom: 14px; }
+      .hero-bottom { left: 12px; right: 12px; max-width: calc(100% - 24px); }
+      .form-row { flex-direction: column; }
+      .join-btn { width: 100%; }
     }
   </style>
 </head>
 <body>
 
-  <video class="bg-video" autoplay muted loop playsinline>
-    <source src="/static/promo.mp4" type="video/mp4">
-  </video>
+  <!-- HERO -->
+  <section class="hero">
+    <video class="bg-video" autoplay muted loop playsinline>
+      <source src="/static/promo.mp4" type="video/mp4">
+    </video>
+    <div class="overlay"></div>
+    <div class="brand">gain</div>
+    <div class="scroll-hint" onclick="document.querySelector('.video-section').scrollIntoView({behavior:'smooth'})">
+      Watch
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 2v10M3 8l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </section>
 
-  <div class="overlay"></div>
+  <!-- VIDEO -->
+  <section class="video-section">
+    <div class="video-label">See it in action</div>
+    <div class="video-headline">Same question. Different brain.</div>
+    <div class="video-sub">Watch how changing the behavioral state produces measurably different output — without touching the prompt.</div>
+    <div class="yt-wrap">
+      <iframe
+        src="https://www.youtube.com/embed/lgLKg9VHMkU?rel=0&modestbranding=1"
+        title="Gain — The AI Behavioral Mixing Board"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen>
+      </iframe>
+    </div>
+  </section>
 
-  <div class="brand">gain</div>
-
-  <div class="bottom">
+  <!-- SIGNUP -->
+  <section class="signup-section">
+    <div class="signup-headline">Get early access.</div>
+    <div class="signup-sub">Gain is in private beta. Drop your email and we'll reach out when your spot is ready.</div>
     <div class="form-row">
       <input class="email-input" id="emailInput" type="email" placeholder="your@email.com" autocomplete="email"/>
       <button class="join-btn" onclick="joinWaitlist()">GET EARLY ACCESS</button>
     </div>
     <div class="status-msg" id="statusMsg"></div>
-  </div>
+  </section>
 
   <script>
     async function joinWaitlist() {
       const input = document.getElementById('emailInput');
       const msg   = document.getElementById('statusMsg');
       const email = input.value.trim();
+      msg.className = 'status-msg';
       if (!email || !email.includes('@')) { msg.textContent = 'Enter a valid email.'; return; }
       msg.textContent = '';
       try {
@@ -172,9 +303,11 @@
         const data = await res.json();
         if (data.status === 'ok') {
           msg.textContent = "You're in. We'll be in touch.";
+          msg.classList.add('ok');
           input.value = '';
         } else if (data.status === 'already_registered') {
           msg.textContent = "Already on the list.";
+          msg.classList.add('ok');
         } else {
           msg.textContent = data.error || 'Something went wrong.';
           msg.classList.add('err');
