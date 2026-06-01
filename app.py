@@ -37,6 +37,12 @@ def waitlist():
     resend_key = os.getenv('RESEND_API_KEY', '')
     if resend_key:
         try:
+            # Add to Resend Audience
+            requests.post('https://api.resend.com/audiences/7ed2a7d8-e897-454f-937b-9279f67fd845/contacts', headers={
+                'Authorization': f'Bearer {resend_key}',
+                'Content-Type': 'application/json'
+            }, json={'email': email, 'unsubscribed': False}, timeout=5)
+            # Notify inbox
             requests.post('https://api.resend.com/emails', headers={
                 'Authorization': f'Bearer {resend_key}',
                 'Content-Type': 'application/json'
