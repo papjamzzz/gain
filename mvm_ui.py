@@ -626,6 +626,7 @@ HTML = r"""<!DOCTYPE html>
   --magenta2:  #F0ABFF;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:110%;}
 body{
   background:var(--bg);
   background-image:radial-gradient(rgba(0,196,232,.04) 1px,transparent 1px);
