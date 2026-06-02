@@ -636,66 +636,97 @@ body{
 
 /* ── HEADER ─────────────────────────────────────────────── */
 .hdr{
-  padding:0 16px;
+  padding:0 20px;
   border-bottom:1px solid var(--border);
   background:#030507;
   background-image:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 3px);
   display:flex;align-items:center;
-  flex-shrink:0;height:82px;
+  flex-shrink:0;height:96px;
   box-shadow:0 1px 0 rgba(0,200,192,.1);
   position:relative;
 }
 .brand{
-  font-family:'Abril Fatface',serif;font-size:41px;letter-spacing:.06em;line-height:82px;
+  font-family:'Abril Fatface',serif;font-size:48px;letter-spacing:.06em;line-height:96px;
   background:linear-gradient(130deg,#00E8FF 0%,#A0C8FF 50%,#C0A0FF 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 0 6px rgba(0,200,255,.55)) drop-shadow(0 0 14px rgba(160,100,255,.3));
-  flex-shrink:0;
+  flex-shrink:0;padding-right:8px;
 }
 .hdr-center{
   position:absolute;left:50%;transform:translateX(-50%);
-  display:flex;flex-direction:column;align-items:center;gap:3px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
   pointer-events:none;
 }
 .hdr-settings-label{
-  font-size:8.5px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;
-  color:var(--accent);opacity:.7;
+  font-size:13px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--accent);opacity:.9;
+  text-shadow:0 0 12px rgba(0,220,212,.4);
 }
 .hdr-settings{
-  font-size:9px;font-weight:700;color:#C8DCEA;
+  font-size:11px;font-weight:700;color:#C8DCEA;
   letter-spacing:.04em;font-variant-numeric:tabular-nums;
   white-space:nowrap;text-align:center;
   text-shadow:0 0 12px rgba(0,200,192,.25);
 }
-.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:12px;}
 .reset-btn{
-  height:27px;padding:0 11px;border-radius:3px;
-  border:1px solid rgba(0,200,192,.3);background:rgba(0,200,192,.06);
-  color:var(--accent);font-size:8px;font-weight:800;letter-spacing:.12em;
+  height:36px;padding:0 16px;border-radius:4px;
+  border:1.5px solid rgba(0,200,192,.5);background:rgba(0,200,192,.08);
+  color:var(--accent2);font-size:10px;font-weight:800;letter-spacing:.12em;
   text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap;
-  box-shadow:0 0 8px rgba(0,200,192,.1);
+  box-shadow:0 0 12px rgba(0,200,192,.2),0 0 24px rgba(0,200,192,.08);
+  text-shadow:0 0 8px rgba(0,220,212,.5);
   flex-shrink:0;
 }
-.reset-btn:hover{background:rgba(0,200,192,.16);border-color:var(--accent);box-shadow:0 0 16px rgba(0,200,192,.28);}
+.reset-btn:hover{background:rgba(0,200,192,.18);border-color:var(--accent2);box-shadow:0 0 20px rgba(0,200,192,.4),0 0 40px rgba(0,200,192,.15);}
 .faq-btn{
-  width:44px;height:44px;border-radius:50%;
-  border:1px solid var(--accent);background:rgba(0,200,192,.07);
-  color:var(--accent);font-size:20px;font-weight:800;
+  width:48px;height:48px;border-radius:50%;
+  border:1.5px solid var(--accent);background:rgba(0,200,192,.08);
+  color:var(--accent2);font-size:22px;font-weight:800;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .15s;line-height:1;
-  box-shadow:0 0 10px rgba(0,200,192,.28),0 0 20px rgba(0,200,192,.12);
-  text-shadow:0 0 8px rgba(0,232,224,.7);
+  box-shadow:0 0 14px rgba(0,200,192,.35),0 0 28px rgba(0,200,192,.15);
+  text-shadow:0 0 10px rgba(0,232,224,.8);
   flex-shrink:0;
 }
-.faq-btn:hover{background:rgba(0,200,192,.16);color:var(--accent2);border-color:var(--accent2);box-shadow:0 0 16px rgba(0,200,192,.48),0 0 32px rgba(0,200,192,.22);}
+.faq-btn:hover{background:rgba(0,200,192,.18);color:#fff;border-color:var(--accent2);box-shadow:0 0 20px rgba(0,200,192,.55),0 0 40px rgba(0,200,192,.25);}
+.settings-btn{
+  width:48px;height:48px;border-radius:50%;
+  border:1.5px solid rgba(0,200,192,.6);background:rgba(0,200,192,.08);
+  color:var(--accent2);font-size:20px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;line-height:1;
+  box-shadow:0 0 14px rgba(0,200,192,.3),0 0 28px rgba(0,200,192,.1);
+  text-shadow:0 0 8px rgba(0,232,224,.6);
+  flex-shrink:0;
+}
+.settings-btn:hover{background:rgba(0,200,192,.18);color:#fff;border-color:var(--accent2);box-shadow:0 0 20px rgba(0,200,192,.5),0 0 40px rgba(0,200,192,.2);}
 .theme-btn{
-  width:28px;height:28px;border-radius:50%;
-  border:1px solid var(--border2);background:transparent;
-  color:var(--text3);font-size:13px;
+  width:36px;height:36px;border-radius:50%;
+  border:1.5px solid rgba(0,200,192,.45);background:rgba(0,200,192,.06);
+  color:var(--accent);font-size:16px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .2s;line-height:1;flex-shrink:0;
+  box-shadow:0 0 10px rgba(0,200,192,.18);
 }
-.theme-btn:hover{border-color:var(--chrome);color:var(--text2);}
+.theme-btn:hover{border-color:var(--accent2);color:var(--accent2);box-shadow:0 0 16px rgba(0,200,192,.35);}
+/* ── Settings panel ── */
+.settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;}
+.settings-overlay.open{display:block;}
+.settings-panel{position:fixed;right:-360px;top:0;bottom:0;width:320px;background:var(--panel);z-index:101;transition:right .26s cubic-bezier(.4,0,.2,1);border-left:2px solid var(--accent);display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.8);}
+.settings-panel.open{right:0;}
+.settings-hd{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#040608;}
+.settings-title{font-family:'Abril Fatface',serif;font-size:20px;color:var(--accent2);text-shadow:0 0 20px rgba(0,232,224,.4);}
+.settings-close{width:26px;height:26px;border:1px solid var(--border2);background:transparent;cursor:pointer;font-size:13px;color:var(--text2);border-radius:50%;transition:background .12s;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.settings-close:hover{background:var(--panel2);color:var(--accent2);}
+.settings-body{padding:24px 18px;flex:1;display:flex;flex-direction:column;gap:20px;}
+.settings-row{display:flex;flex-direction:column;gap:8px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+.settings-row-label{font-size:9px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--accent2);opacity:.7;}
+.settings-val{font-size:13px;color:var(--text2);}
+.settings-action{height:36px;padding:0 16px;border-radius:4px;border:1.5px solid rgba(0,200,192,.4);background:rgba(0,200,192,.07);color:var(--accent2);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .15s;width:100%;}
+.settings-action:hover{background:rgba(0,200,192,.16);border-color:var(--accent2);}
+.settings-action.danger{border-color:rgba(220,60,60,.4);color:#FF6060;background:rgba(200,40,40,.06);}
+.settings-action.danger:hover{background:rgba(200,40,40,.14);border-color:#FF6060;}
 
 /* ══ LIGHT THEME ════════════════════════════════════════════ */
 body.light{
@@ -1485,11 +1516,11 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
     <div class="hdr-settings" id="hdr-settings">—</div>
   </div>
   <div class="hdr-right">
-    <span id="user-email" style="font-size:9px;letter-spacing:.08em;color:var(--text3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <span id="user-email" style="display:none"></span>
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
-    <button class="reset-btn" onclick="resetDefaults()">Reset to Defaults</button>
+    <button class="reset-btn" onclick="resetDefaults()">Reset</button>
+    <button class="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
     <button class="faq-btn" onclick="openFaq()">?</button>
-    <button class="reset-btn" id="logout-btn" onclick="logout()" style="display:none">Sign Out</button>
   </div>
 </div>
 
@@ -1781,6 +1812,33 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
   </div><!-- /right bank -->
 
 </div><!-- /console -->
+
+<!-- SETTINGS -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettings()"></div>
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-hd">
+    <span class="settings-title">settings</span>
+    <button class="settings-close" onclick="closeSettings()">✕</button>
+  </div>
+  <div class="settings-body">
+    <div class="settings-row">
+      <div class="settings-row-label">Account</div>
+      <div class="settings-val" id="settings-email" style="color:var(--accent2);">—</div>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-label">Appearance</div>
+      <button class="settings-action" onclick="toggleTheme()">Toggle Light / Dark Mode</button>
+    </div>
+    <div class="settings-row">
+      <div class="settings-row-label">Board</div>
+      <button class="settings-action" onclick="resetDefaults();closeSettings()">Reset All to Defaults</button>
+    </div>
+    <div class="settings-row" style="border:none">
+      <div class="settings-row-label">Session</div>
+      <button class="settings-action danger" id="settings-logout-btn" onclick="logout()" style="display:none">Sign Out</button>
+    </div>
+  </div>
+</div>
 
 <!-- FAQ -->
 <div class="faq-overlay" id="faq-overlay" onclick="closeFaq()"></div>
@@ -2686,6 +2744,17 @@ async function resetDefaults() {
 // ── FAQ ───────────────────────────────────────────────────────────
 function openFaq()  { document.getElementById('faq-overlay').classList.add('open'); document.getElementById('faq-panel').classList.add('open'); }
 function closeFaq() { document.getElementById('faq-overlay').classList.remove('open'); document.getElementById('faq-panel').classList.remove('open'); }
+function openSettings() {
+  document.getElementById('settings-overlay').classList.add('open');
+  document.getElementById('settings-panel').classList.add('open');
+  const email = document.getElementById('user-email')?.textContent || '';
+  const token = getToken();
+  const emailEl = document.getElementById('settings-email');
+  const logoutBtn = document.getElementById('settings-logout-btn');
+  if (emailEl) emailEl.textContent = email || (token ? 'Signed in' : 'Not signed in');
+  if (logoutBtn) logoutBtn.style.display = token ? '' : 'none';
+}
+function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); document.getElementById('settings-panel').classList.remove('open'); }
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeFaq(); return; }
   // Suppress shortcuts when typing in an input
