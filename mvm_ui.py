@@ -7,7 +7,7 @@ import os
 import signal
 import importlib.util
 from pathlib import Path
-from flask import Flask, Response, request, jsonify, render_template, redirect, url_for
+from flask import Flask, Response, request, jsonify, redirect, url_for
 from functools import wraps
 
 try:
@@ -248,9 +248,7 @@ def require_auth(f):
 
 @app.route("/login")
 def login():
-    return render_template("login.html",
-        supabase_url=SUPABASE_URL,
-        supabase_anon_key=SUPABASE_ANON)
+    return LOGIN_HTML
 
 @app.route("/auth/callback")
 def auth_callback():
@@ -485,6 +483,114 @@ def health():
     return jsonify({"ok": True, "model": MODEL,
                     "api_key_set": bool(os.environ.get("ANTHROPIC_API_KEY"))})
 
+
+# ── LOGIN HTML ────────────────────────────────────────────────────────────────
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gain — Sign In</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Abril+Fatface&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #000; font-family: 'Inter', sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .bg-grid { position: fixed; inset: 0; z-index: 0; background-image: linear-gradient(rgba(0,220,212,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,220,212,.04) 1px, transparent 1px); background-size: 40px 40px; }
+    .card { position: relative; z-index: 10; width: 100%; max-width: 380px; background: rgba(6,10,18,.92); border: 1px solid rgba(0,220,212,.15); border-radius: 6px; padding: 40px 36px; box-shadow: 0 0 80px rgba(0,180,200,.06); }
+    .brand { font-family: 'Abril Fatface', serif; font-size: 32px; letter-spacing: .06em; background: linear-gradient(130deg,#00E8FF 0%,#A0C8FF 50%,#C0A0FF 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 8px rgba(0,200,255,.4)); margin-bottom: 6px; }
+    .tagline { font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: rgba(0,220,212,.5); margin-bottom: 36px; }
+    .section-label { font-size: 9px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: rgba(180,210,230,.3); margin-bottom: 10px; }
+    .btn-google { width: 100%; height: 44px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); border-radius: 4px; color: #fff; font-size: 13px; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all .15s; margin-bottom: 24px; }
+    .btn-google:hover { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.22); }
+    .divider { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,.07); }
+    .divider-text { font-size: 10px; color: rgba(255,255,255,.2); letter-spacing: .1em; text-transform: uppercase; }
+    .input { width: 100%; height: 42px; background: rgba(6,10,15,.8); border: 1px solid rgba(0,220,212,.18); border-radius: 3px; color: #D8EAF8; font-size: 16px; font-family: 'Inter', sans-serif; padding: 0 13px; outline: none; transition: border-color .2s; margin-bottom: 10px; }
+    .input::placeholder { color: rgba(130,170,190,.35); }
+    .input:focus { border-color: rgba(0,220,212,.5); }
+    .btn-primary { width: 100%; height: 42px; background: rgba(0,180,200,.2); border: 1px solid rgba(0,220,212,.4); border-radius: 3px; color: #00DDD4; font-size: 10px; font-weight: 800; font-family: 'Inter', sans-serif; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; transition: all .15s; margin-top: 4px; }
+    .btn-primary:hover { background: rgba(0,200,212,.28); border-color: rgba(0,220,212,.7); }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+    .tab-row { display: flex; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .tab { flex: 1; padding: 8px 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.25); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s; margin-bottom: -1px; }
+    .tab.active { color: #00DDD4; border-bottom-color: #00DDD4; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .status { font-size: 11px; font-weight: 600; letter-spacing: .06em; min-height: 18px; margin-top: 10px; text-align: center; }
+    .status.ok { color: #00DDD4; } .status.err { color: #FF5050; }
+    .footer { margin-top: 28px; text-align: center; font-size: 10px; color: rgba(255,255,255,.15); letter-spacing: .06em; }
+    .footer a { color: rgba(0,220,212,.4); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <div class="card">
+    <div class="brand">gain</div>
+    <div class="tagline">The AI Behavioral Mixing Board</div>
+    <div class="section-label">Continue with</div>
+    <button class="btn-google" onclick="signInGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg>
+      Continue with Google
+    </button>
+    <div class="divider"><div class="divider-line"></div><div class="divider-text">or</div><div class="divider-line"></div></div>
+    <div class="tab-row">
+      <button class="tab active" onclick="switchTab('password')">Password</button>
+      <button class="tab" onclick="switchTab('magic')">Magic Link</button>
+    </div>
+    <div class="tab-panel active" id="panel-password">
+      <input class="input" id="pw-email" type="email" placeholder="your@email.com" autocomplete="email"/>
+      <input class="input" id="pw-password" type="password" placeholder="password" autocomplete="current-password"/>
+      <button class="btn-primary" id="pw-btn" onclick="signInPassword()">Sign In</button>
+      <div style="text-align:center;margin-top:10px">
+        <a href="#" onclick="switchMode()" id="mode-link" style="font-size:11px;color:rgba(0,220,212,.45);text-decoration:none">No account? Create one</a>
+      </div>
+    </div>
+    <div class="tab-panel" id="panel-magic">
+      <input class="input" id="magic-email" type="email" placeholder="your@email.com" autocomplete="email"/>
+      <button class="btn-primary" id="magic-btn" onclick="sendMagicLink()">Send Magic Link</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="footer"><a href="https://gain.creativekonsoles.com">← Back to gain.creativekonsoles.com</a></div>
+  </div>
+  <script>
+    const SB_URL = '__SUPABASE_URL__';
+    const SB_KEY = '__SUPABASE_KEY__';
+    const CALLBACK = window.location.origin + '/auth/callback';
+    let isSignUp = false;
+    function switchMode() { isSignUp=!isSignUp; document.getElementById('pw-btn').textContent=isSignUp?'CREATE ACCOUNT':'SIGN IN'; document.getElementById('mode-link').textContent=isSignUp?'Have an account? Sign in':'No account? Create one'; setStatus(''); }
+    function switchTab(tab) { document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='password')||(i===1&&tab==='magic'))); document.getElementById('panel-password').classList.toggle('active',tab==='password'); document.getElementById('panel-magic').classList.toggle('active',tab==='magic'); setStatus(''); }
+    function setStatus(msg,type='') { const el=document.getElementById('status'); el.textContent=msg; el.className='status'+(type?' '+type:''); }
+    function signInGoogle() { window.location.href=SB_URL+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(CALLBACK); }
+    async function signInPassword() {
+      const email=document.getElementById('pw-email').value.trim(), password=document.getElementById('pw-password').value;
+      if(!email||!password){setStatus('Enter email and password.','err');return;}
+      const btn=document.getElementById('pw-btn'); btn.disabled=true;
+      setStatus(isSignUp?'Creating account…':'Signing in…');
+      const endpoint=isSignUp?SB_URL+'/auth/v1/signup':SB_URL+'/auth/v1/token?grant_type=password';
+      try {
+        const res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({email,password})});
+        const data=await res.json();
+        if(data.error||data.error_description){setStatus(data.error_description||data.error,'err');}
+        else if(data.access_token){localStorage.setItem('sb-access-token',data.access_token);localStorage.setItem('sb-refresh-token',data.refresh_token||'');window.location.href='/app';}
+        else{setStatus('Check your email to confirm your account.','ok');}
+      } catch(e){setStatus('Network error. Try again.','err');}
+      btn.disabled=false;
+    }
+    async function sendMagicLink() {
+      const email=document.getElementById('magic-email').value.trim();
+      if(!email){setStatus('Enter your email.','err');return;}
+      const btn=document.getElementById('magic-btn'); btn.disabled=true; setStatus('Sending…');
+      try {
+        const res=await fetch(SB_URL+'/auth/v1/otp',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},body:JSON.stringify({email,options:{emailRedirectTo:CALLBACK}})});
+        const data=await res.json();
+        if(data.error){setStatus(data.error,'err');}else{setStatus('Magic link sent. Check your inbox.','ok');}
+      } catch(e){setStatus('Network error. Try again.','err');}
+      btn.disabled=false;
+    }
+  </script>
+</body>
+</html>""".replace('__SUPABASE_URL__', SUPABASE_URL).replace('__SUPABASE_KEY__', SUPABASE_ANON)
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
