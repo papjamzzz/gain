@@ -146,7 +146,7 @@ def _sb_headers(token=None):
         h["Authorization"] = f"Bearer {SUPABASE_SERVICE}"
     return h
 
-def _get_user_id(token: str) -> str | None:
+def _get_user_id(token: str):
     """Validate token and return user_id."""
     if not token or not SUPABASE_URL:
         return None
