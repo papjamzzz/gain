@@ -1325,6 +1325,14 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 }
 .launch-input:focus{border-color:var(--purple);box-shadow:0 0 0 2px rgba(139,92,246,.08);}
 .launch-input::placeholder{color:var(--text3);}
+.glow-input::placeholder{
+  color:rgba(0,220,212,.55);
+  animation:placeholder-pulse 2.8s ease-in-out infinite;
+}
+@keyframes placeholder-pulse{
+  0%,100%{color:rgba(0,220,212,.45);}
+  50%{color:rgba(0,220,212,.85);}
+}
 .launch-btn{
   height:32px;padding:0 16px;
   background:linear-gradient(180deg,#100828,#0A0518);
@@ -1667,7 +1675,7 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 
     <!-- CTRL RUN LAUNCHER -->
     <div class="launch-wrap">
-      <input class="launch-input" id="launch-input" type="text" placeholder="type a task · Enter to run — reads and writes files, no terminal needed">
+      <input class="launch-input glow-input" id="launch-input" type="text" placeholder="✦  go ahead — type something crazy and see what happens">
       <span class="launch-running" id="launch-running">● RUNNING</span>
       <button class="launch-btn" id="launch-btn">LAUNCH</button>
     </div>
@@ -1675,10 +1683,10 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
     <div class="preview-wrap">
       <div class="preview-top">
         <span class="preview-hd">PREVIEW RUN</span>
-        <span class="api-tag">Claude API · no file access</span>
+        <span class="api-tag">no files touched — just ideas</span>
       </div>
       <div class="task-row">
-        <input class="task-input" id="task-input" type="text" placeholder="type a task to preview parameter effects…">
+        <input class="task-input glow-input" id="task-input" type="text" placeholder="✦  try something here first — safe to experiment">
         <button class="run-btn" id="run-btn">RUN</button>
       </div>
       <div class="resp-wrap" id="resp-wrap">
@@ -1778,173 +1786,136 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 <div class="faq-overlay" id="faq-overlay" onclick="closeFaq()"></div>
 <div class="faq-panel" id="faq-panel">
   <div class="faq-hd">
-    <span class="faq-title">control</span>
+    <span class="faq-title">how gain works</span>
     <button class="faq-close" onclick="closeFaq()">✕</button>
   </div>
   <div class="faq-body">
 
     <div class="faq-s">
-      <div class="faq-s-title">what is gain?</div>
-      <p class="faq-p">Gain is a behavioral mixing board for AI coding agents. Every fader, knob, and button writes to a system prompt in real time. Same task, different state — measurably different output. You perform instead of prompt.</p>
-      <p class="faq-p">Four tracks. Each one controls a different dimension of how Claude thinks. All parameters flow through <code style="background:#040608;padding:1px 4px;border-radius:2px;font-size:10px">~/.streamfader/state.json</code>, which the CLI reads on every run.</p>
+      <div class="faq-s-title">what is this?</div>
+      <p class="faq-p">Gain is a mixing board for AI. Instead of rewriting your prompt every time, you move faders and flip switches to change <em>how</em> Claude thinks — not what you ask.</p>
+      <p class="faq-p">Same question. Different settings. Completely different answer. That's the whole idea.</p>
     </div>
 
     <div class="faq-s">
-      <div class="faq-s-title">T1 — MODE</div>
+      <div class="faq-s-title">the two ways to run</div>
+      <div class="faq-track">
+        <div class="faq-track-name" style="color:#A78BFA">LAUNCH — the real thing</div>
+        <div class="faq-track-desc">Claude reads your files, writes code, and gets things done. Use this when you're ready to actually build something. Every fader position shapes what it does and how it talks to you.</div>
+      </div>
+      <div class="faq-track" style="margin-top:8px">
+        <div class="faq-track-name" style="color:var(--accent2)">PREVIEW RUN — safe to experiment</div>
+        <div class="faq-track-desc">No files touched. Claude just responds in plain text. Great for trying different settings and seeing how the output changes before you commit to anything.</div>
+      </div>
+      <p class="faq-p" style="margin-top:8px;opacity:.6">Not sure which to use? Start with Preview Run. You can't break anything there.</p>
+    </div>
+
+    <div class="faq-s">
+      <div class="faq-s-title">track 1 — how hard it works</div>
       <div class="faq-track">
         <div class="faq-track-name">Fader: Effort &nbsp;·&nbsp; Knob: Thinking Time</div>
-        <div class="faq-track-desc">Sets what Claude is allowed to do and how it reasons.</div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--accent2)">EXPLORE</strong> — analysis only. No code changes. Ends with a single decision point.<br>
-          <strong style="color:var(--accent2)">BUILD</strong> — one atomic change only. No refactoring unless required.<br>
-          <em style="opacity:.5">Nothing selected = track off, mode rules skipped.</em>
-        </div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Effort</strong> — HIGH compresses output to direct execution. LOW opens verbose exploratory reasoning.<br>
-          <strong style="color:var(--text)">Thinking Time</strong> — HIGH allows deep diagnostic chains. LOW keeps reasoning at the surface.
+        <div class="faq-track-desc">
+          <strong style="color:var(--accent2)">EXPLORE</strong> — Claude looks around and tells you what it sees. No changes made. Just analysis and a recommendation.<br><br>
+          <strong style="color:var(--accent2)">BUILD</strong> — Claude makes one focused change. Nothing extra.<br><br>
+          <strong style="color:var(--text)">Effort fader</strong> — slide up for faster, more direct output. Slide down for more explanation and reasoning.<br>
+          <strong style="color:var(--text)">Thinking Time knob</strong> — turn up for deeper analysis. Turn down to keep things quick and surface-level.
         </div>
       </div>
     </div>
 
     <div class="faq-s">
-      <div class="faq-s-title">T2 — CONFIDENCE</div>
+      <div class="faq-s-title">track 2 — how confident it acts</div>
       <div class="faq-track" style="border-left-color:#8B5CF6">
         <div class="faq-track-name">Fader: Confidence &nbsp;·&nbsp; Knob: Boldness</div>
-        <div class="faq-track-desc">Controls how committed Claude is to its choices and how bold the changes are.</div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:#A78BFA">LIST</strong> — shows 2–3 alternatives with pros/cons. Does not pick.<br>
-          <strong style="color:#A78BFA">DECIDE</strong> — picks one approach and implements it. Zero explanation of alternatives.
-        </div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Confidence</strong> — HIGH commits to one solution, no hedging. LOW shows options.<br>
-          <strong style="color:var(--text)">Boldness</strong> — HIGH pursues the best solution even if it requires large changes. LOW stays close to existing patterns.
+        <div class="faq-track-desc">
+          <strong style="color:#A78BFA">LIST</strong> — Claude shows you 2 or 3 options with pros and cons. Doesn't pick. You decide.<br><br>
+          <strong style="color:#A78BFA">DECIDE</strong> — Claude picks one path and goes. No debate, no alternatives. Just action.<br><br>
+          <strong style="color:var(--text)">Confidence fader</strong> — high means it commits fully. Low means it shows you the options.<br>
+          <strong style="color:var(--text)">Boldness knob</strong> — high means it'll make bigger moves if that's what it takes. Low means it stays careful and close to what's already there.
         </div>
       </div>
     </div>
 
     <div class="faq-s">
-      <div class="faq-s-title">T3 — SCOPE</div>
+      <div class="faq-s-title">track 3 — how wide it looks</div>
       <div class="faq-track" style="border-left-color:#00A8A0">
         <div class="faq-track-name">Fader: Zoom Level &nbsp;·&nbsp; Knob: Context Size</div>
-        <div class="faq-track-desc">Controls how wide Claude looks when building context.</div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--accent2)">FILE</strong> — strict local scope. This file only, no cross-module pulls.<br>
-          <strong style="color:var(--accent2)">PROJECT</strong> — full codebase context allowed, global awareness.
-        </div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Zoom Level</strong> — how far out Claude searches for relevant code and context.<br>
-          <strong style="color:var(--text)">Context Size</strong> — HIGH pulls in adjacent concerns freely. LOW is surgical, touches nothing adjacent.
+        <div class="faq-track-desc">
+          <strong style="color:var(--accent2)">FILE</strong> — Claude only looks at the one file you're working in. Focused and contained.<br><br>
+          <strong style="color:var(--accent2)">PROJECT</strong> — Claude can see the whole codebase. Use this for bigger changes that touch multiple things.<br><br>
+          <strong style="color:var(--text)">Zoom Level fader</strong> — how far out Claude searches for context.<br>
+          <strong style="color:var(--text)">Context Size knob</strong> — how much related information it pulls in. High = everything nearby. Low = nothing it didn't ask for.
         </div>
       </div>
     </div>
 
     <div class="faq-s">
-      <div class="faq-s-title">T4 — VOICE</div>
+      <div class="faq-s-title">track 4 — how it talks to you</div>
       <div class="faq-track" style="border-left-color:#6040C8">
         <div class="faq-track-name">Fader: Verbosity &nbsp;·&nbsp; Knob: Memory Persistence</div>
-        <div class="faq-track-desc">Controls how output feels — the texture of Claude's responses.</div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:#A78BFA">DIRECT</strong> — dead room. Output only, zero commentary or preamble.<br>
-          <strong style="color:#A78BFA">OPEN</strong> — full resonance. Thinks out loud with you, collaborative tone.
-        </div>
-        <div class="faq-track-desc" style="margin-top:6px">
-          <strong style="color:var(--text)">Verbosity</strong> — WET gives breathing room and space. DRY is close-mic'd, just the output.<br>
-          <strong style="color:var(--text)">Memory Persistence</strong> — LONG lets ideas echo and build. SHORT compresses to tight, every-word-counts density.
-        </div>
-      </div>
-    </div>
-
-    <div class="faq-s">
-      <div class="faq-s-title">muting tracks</div>
-      <p class="faq-p">Every track can be turned off independently. A muted track contributes nothing to the system prompt — those rules are completely skipped.</p>
-      <p class="faq-p">Two ways to mute a track:</p>
-      <p class="faq-p"><strong style="color:var(--accent2)">◉ button</strong> in the channel header — top right of each strip. Click to toggle off/on. Glows red when muted.</p>
-      <p class="faq-p"><strong style="color:#D07070">MUTE button</strong> in the button row — middle button on each track. Same toggle, different physical location. Pulses red when active to make muted state visible at a glance.</p>
-      <p class="faq-p">On a physical nanoKONTROL2, the <strong style="color:var(--text)">M buttons</strong> (row 2 on the controller) mute the corresponding track.</p>
-    </div>
-
-    <div class="faq-s">
-      <div class="faq-s-title">button toggle behavior</div>
-      <p class="faq-p">All mode buttons (EXPLORE, BUILD, LIST, DECIDE, FILE, PROJECT, DIRECT, OPEN) are deselectable. Click an active button again to turn it off entirely. When nothing is selected, that parameter is absent from the system prompt — Claude uses its default behavior for that dimension.</p>
-      <p class="faq-p">This is different from picking a middle ground. Leaving a parameter empty means <em>no rule applied</em>, not a neutral setting.</p>
-    </div>
-
-    <div class="faq-s">
-      <div class="faq-s-title">faders</div>
-      <p class="faq-p"><strong style="color:var(--text)">Drag</strong> — click and drag vertically anywhere on the track. The Level Halo (atmospheric glow fill) rises with the value — the higher the setting, the more light pools in the channel.</p>
-      <p class="faq-p"><strong style="color:var(--text)">Fine mode</strong> — hold <kbd style="background:#040608;padding:1px 5px;border-radius:2px;font-size:10px;border:1px solid var(--border2)">Shift</kbd> while dragging for 5× precision. Useful for dialing exact values.</p>
-      <p class="faq-p"><strong style="color:var(--text)">Reset</strong> — double-click the thumb to reset to 0.50.</p>
-      <p class="faq-p">The fader glows teal (T1/T3) or purple (T2/T4) during both mouse drag and physical controller movement.</p>
-    </div>
-
-    <div class="faq-s">
-      <div class="faq-s-title">knobs</div>
-      <p class="faq-p"><strong style="color:var(--text)">Drag vertically</strong> on the knob — up increases, down decreases. The arc fills clockwise to show position.</p>
-      <p class="faq-p">The knob glow scales with the value — at 0 it barely glows; at 1.0 it burns bright. You can read rough position from the glow intensity without looking at the number.</p>
-      <p class="faq-p"><strong style="color:var(--text)">Center flash</strong> — when you hit 0.50 exactly, the dot briefly flashes white as a detent cue.</p>
-    </div>
-
-    <div class="faq-s">
-      <div class="faq-s-title">LAUNCH vs PREVIEW RUN</div>
-      <p class="faq-p"><strong style="color:#A78BFA">LAUNCH</strong> (purple) — full agentic loop. Claude reads files, writes code, runs shell commands — up to 20 tool turns. This is the real thing. Every move on the board shapes what it does and how it responds.</p>
-      <p class="faq-p"><strong style="color:var(--accent2)">PREVIEW RUN</strong> (teal) — API only, no file access. Shows you exactly what your current state produces in plain text. Good for dialing in behavior before committing to a full run.</p>
-    </div>
-
-    <div class="faq-s">
-      <div class="faq-s-title">physical controller</div>
-      <p class="faq-p">Korg nanoKONTROL2. Start the MIDI bridge:</p>
-      <code class="faq-code">ctrl nano --start</code>
-      <p class="faq-p">Controller layout:</p>
-      <div class="faq-track">
         <div class="faq-track-desc">
-          <strong style="color:var(--text)">Faders 1–4</strong> — Effort, Confidence, Zoom Level, Verbosity<br>
-          <strong style="color:var(--text)">Knobs 1–4</strong> — Thinking Time, Boldness, Context Size, Memory Persistence<br>
-          <strong style="color:var(--text)">S buttons</strong> (row 1) — left-extreme mode per track (EXPLORE / LIST / FILE / DIRECT)<br>
-          <strong style="color:var(--text)">M buttons</strong> (row 2) — mute T1 / T2 / T3 / T4<br>
-          <strong style="color:var(--text)">R buttons</strong> (row 3) — right-extreme mode per track (BUILD / DECIDE / PROJECT / OPEN)<br>
-          <strong style="color:var(--text)">PLAY</strong> — replay last task<br>
-          <strong style="color:var(--text)">STOP</strong> — kill running Claude process
+          <strong style="color:#A78BFA">DIRECT</strong> — just the output. No preamble, no commentary. Claude talks less and does more.<br><br>
+          <strong style="color:#A78BFA">OPEN</strong> — Claude thinks out loud with you. More collaborative, more visible reasoning.<br><br>
+          <strong style="color:var(--text)">Verbosity fader</strong> — how much space Claude gives its response. High = more breathing room. Low = tight and compressed.<br>
+          <strong style="color:var(--text)">Memory Persistence knob</strong> — high means ideas build on each other and expand. Low means it stays short and dense.
         </div>
       </div>
-      <p class="faq-p">M button LEDs light up when that track is muted. Everything syncs back to the UI in real time via SSE — no refresh needed.</p>
     </div>
 
     <div class="faq-s">
-      <div class="faq-s-title">presets</div>
-      <p class="faq-p">Save any board state as a named preset. Type a name in the PRESETS bar and hit Enter or SAVE. Click a preset chip to load it instantly — the board snaps to that state in real time.</p>
-      <p class="faq-p">Presets are saved to <code style="background:#040608;padding:1px 4px;border-radius:2px;font-size:10px">~/.streamfader/presets/</code> as JSON files. They persist across restarts and sync with the CLI and MIDI bridge automatically.</p>
+      <div class="faq-s-title">turning tracks on and off</div>
+      <p class="faq-p">Every track can be completely switched off. When a track is off, it has zero influence on the output — like unplugging a channel on a real mixing board.</p>
+      <p class="faq-p">Hit the <strong style="color:#D07070">MUTE</strong> button on any track to turn it off. Hit it again to bring it back. The small dot in the track header does the same thing.</p>
+      <p class="faq-p">Turning off a track you're not using keeps things clean and focused. You don't have to use all four.</p>
+    </div>
+
+    <div class="faq-s">
+      <div class="faq-s-title">the buttons on each track</div>
+      <p class="faq-p">Each track has two mode buttons — one on the left side, one on the right. They set the extreme position for that track.</p>
+      <p class="faq-p">Click a button to select it. Click it again to turn it off. Nothing selected means that track is fully open — no rules applied in that direction. That's different from neutral. It means Claude uses its own judgment there.</p>
+    </div>
+
+    <div class="faq-s">
+      <div class="faq-s-title">moving the faders and knobs</div>
+      <p class="faq-p"><strong style="color:var(--text)">Faders</strong> — click and drag up or down. Hold Shift while dragging for finer control. Double-click the thumb to reset it to the middle.</p>
+      <p class="faq-p"><strong style="color:var(--text)">Knobs</strong> — drag up to increase, down to decrease. The arc around the knob shows its position. When it hits the center exactly, it briefly flashes white.</p>
+    </div>
+
+    <div class="faq-s">
+      <div class="faq-s-title">saving presets</div>
+      <p class="faq-p">Found a combination that works? Save it. Type a name in the Presets bar and hit Enter or Save. It appears as a chip you can click anytime to restore that exact state.</p>
+      <p class="faq-p">Your presets are saved to your account and stay there across sessions.</p>
     </div>
 
     <div class="faq-s">
       <div class="faq-s-title">keyboard shortcuts</div>
       <div class="faq-track">
         <div class="faq-track-desc">
-          <strong style="color:var(--text)">Space</strong> — Abort running Claude process<br>
-          <strong style="color:var(--text)">1 / 2 / 3 / 4</strong> — Mute / unmute Track 1 – 4<br>
-          <strong style="color:var(--text)">R</strong> — Reset all faders and knobs to 0.50<br>
-          <strong style="color:var(--text)">T</strong> — Toggle light / dark theme<br>
-          <strong style="color:var(--text)">?</strong> — Open this panel<br>
-          <strong style="color:var(--text)">Esc</strong> — Close this panel
+          <strong style="color:var(--text)">Space</strong> — stop Claude mid-run<br>
+          <strong style="color:var(--text)">1 / 2 / 3 / 4</strong> — mute or unmute each track<br>
+          <strong style="color:var(--text)">R</strong> — reset everything to the middle<br>
+          <strong style="color:var(--text)">T</strong> — switch between light and dark mode<br>
+          <strong style="color:var(--text)">?</strong> — open this guide<br>
+          <strong style="color:var(--text)">Esc</strong> — close this guide
         </div>
       </div>
-      <p class="faq-p" style="margin-top:8px">Shortcuts are suppressed when the preset name field is focused.</p>
     </div>
 
     <div class="faq-s">
-      <div class="faq-s-title">practical combos</div>
+      <div class="faq-s-title">try these combinations</div>
       <div class="faq-track">
-        <div class="faq-track-name">Analyze before touching code</div>
-        <div class="faq-track-desc">T1: EXPLORE, Effort LOW, Thinking Time HIGH. T2: LIST. Mute T3 + T4. Ask anything. No files touched, full options shown.</div>
+        <div class="faq-track-name">Just exploring — not ready to change anything</div>
+        <div class="faq-track-desc">Track 1: EXPLORE, Effort low, Thinking Time high. Track 2: LIST. Mute Tracks 3 and 4. Ask anything. Claude maps the problem and shows your options. Nothing gets touched.</div>
       </div>
-      <div class="faq-track">
-        <div class="faq-track-name">Fast surgical fix</div>
-        <div class="faq-track-desc">T1: BUILD, Effort HIGH. T2: DECIDE, Confidence HIGH, Boldness LOW. T3: FILE. T4: DIRECT. One file, one fix, no commentary.</div>
+      <div class="faq-track" style="margin-top:8px">
+        <div class="faq-track-name">One quick fix, no extras</div>
+        <div class="faq-track-desc">Track 1: BUILD, Effort high. Track 2: DECIDE, Confidence high. Track 3: FILE. Track 4: DIRECT. In, fixed, out. No commentary.</div>
       </div>
-      <div class="faq-track">
-        <div class="faq-track-name">Risky refactor</div>
-        <div class="faq-track-desc">T1: BUILD, Thinking Time HIGH. T2: DECIDE, Boldness HIGH. T3: PROJECT, Context Size HIGH. T4: STUDIO. Full codebase access, bold changes, clean output.</div>
+      <div class="faq-track" style="margin-top:8px">
+        <div class="faq-track-name">Big swing — let it go wide</div>
+        <div class="faq-track-desc">Track 1: BUILD, Thinking Time high. Track 2: DECIDE, Boldness high. Track 3: PROJECT, Context Size high. Track 4: STUDIO. Full picture, bold moves, clean output.</div>
       </div>
-      <p class="faq-p" style="opacity:.3;font-style:italic;margin-top:12px">Same task. Different state. That's the machine.</p>
+      <p class="faq-p" style="opacity:.3;font-style:italic;margin-top:14px">Same task. Different state. That's the machine.</p>
     </div>
 
   </div>
@@ -2783,6 +2754,211 @@ window.fetch = function(url, opts) {
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
   localStorage.setItem('gain_theme', isLight ? 'light' : 'dark');
+}
+</script>
+
+<!-- ── ONBOARDING ── -->
+<style>
+#onboard-overlay {
+  display:none;
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.92);
+  align-items:center;justify-content:center;
+  flex-direction:column;gap:0;
+}
+#onboard-overlay.active { display:flex; }
+.ob-card {
+  display:none;
+  flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:48px 40px;
+  max-width:480px;width:90%;
+  border:1px solid rgba(0,220,212,.2);
+  border-radius:8px;background:rgba(4,8,14,.95);
+  box-shadow:0 0 80px rgba(0,180,200,.1);
+  animation:ob-in .4s ease forwards;
+}
+.ob-card.active { display:flex; }
+@keyframes ob-in {
+  from{opacity:0;transform:translateY(20px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.ob-num {
+  font-size:10px;font-weight:800;letter-spacing:.2em;
+  color:rgba(0,220,212,.4);text-transform:uppercase;margin-bottom:20px;
+}
+.ob-title {
+  font-family:'Abril Fatface',serif;font-size:28px;
+  background:linear-gradient(130deg,#00E8FF 0%,#A0C8FF 50%,#C0A0FF 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:16px;line-height:1.2;
+}
+.ob-body {
+  font-size:15px;line-height:1.7;color:rgba(200,225,240,.7);
+  margin-bottom:32px;
+}
+.ob-next {
+  height:44px;padding:0 32px;
+  background:rgba(0,180,200,.2);border:1px solid rgba(0,220,212,.5);
+  border-radius:4px;color:#00DDD4;font-size:11px;font-weight:800;
+  letter-spacing:.14em;text-transform:uppercase;cursor:pointer;
+  transition:all .15s;font-family:'Inter',sans-serif;
+}
+.ob-next:hover{background:rgba(0,200,212,.3);box-shadow:0 0 20px rgba(0,220,212,.3);}
+#fw-canvas{position:fixed;inset:0;z-index:10000;pointer-events:none;display:none;}
+</style>
+
+<div id="onboard-overlay">
+  <div class="ob-card active" id="ob-1">
+    <div class="ob-num">01 of 04</div>
+    <div class="ob-title">Welcome to Gain.</div>
+    <div class="ob-body">This is a mixing board for AI.<br>Not a chat window. Not a prompt builder.<br>A board you perform on.</div>
+    <button class="ob-next" onclick="obNext(2)">Got it →</button>
+  </div>
+  <div class="ob-card" id="ob-2">
+    <div class="ob-num">02 of 04</div>
+    <div class="ob-title">Move a fader.<br>Change how it thinks.</div>
+    <div class="ob-body">Each track controls a different dimension — how hard it works, how confident it acts, how wide it looks, how it talks to you.<br><br>Same question. Different settings. Completely different answer.</div>
+    <button class="ob-next" onclick="obNext(3)">Keep going →</button>
+  </div>
+  <div class="ob-card" id="ob-3">
+    <div class="ob-num">03 of 04</div>
+    <div class="ob-title">Try Preview Run first.</div>
+    <div class="ob-body">It's completely safe. No files touched. Just type something in the bottom box, hit RUN, and see what happens.<br><br>Move a fader. Run it again. Feel the difference.</div>
+    <button class="ob-next" onclick="obNext(4)">Almost there →</button>
+  </div>
+  <div class="ob-card" id="ob-4">
+    <div class="ob-num">04 of 04</div>
+    <div class="ob-title">You're ready.<br>Go make something.</div>
+    <div class="ob-body">The ? button in the top right opens this guide anytime you need it.<br><br>Now go dial it in.</div>
+    <button class="ob-next" onclick="obFinish()">Let's go ✦</button>
+  </div>
+</div>
+
+<canvas id="fw-canvas"></canvas>
+
+<script>
+// ── Onboarding ────────────────────────────────────────────
+(function initOnboard() {
+  if (localStorage.getItem('gain_onboarded')) return;
+  document.getElementById('onboard-overlay').classList.add('active');
+})();
+
+function obNext(n) {
+  document.querySelectorAll('.ob-card').forEach(c => c.classList.remove('active'));
+  const next = document.getElementById('ob-' + n);
+  if (next) { next.classList.remove('active'); void next.offsetWidth; next.classList.add('active'); }
+}
+
+function obFinish() {
+  document.getElementById('onboard-overlay').classList.remove('active');
+  localStorage.setItem('gain_onboarded', '1');
+  launchFireworks();
+}
+
+// ── Fireworks ─────────────────────────────────────────────
+function launchFireworks() {
+  const canvas = document.getElementById('fw-canvas');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.display = 'block';
+  const ctx = canvas.getContext('2d');
+
+  const COLORS = [
+    '#00E8FF','#00DDD4','#A0C8FF','#C0A0FF',
+    '#8B5CF6','#00C8C0','#6040C8','#FFFFFF',
+    '#00FFEE','#B060FF','#40E8FF','#FF80FF'
+  ];
+
+  const particles = [];
+  let startTime = null;
+  const DURATION = 4000;
+
+  function randomColor() { return COLORS[Math.floor(Math.random() * COLORS.length)]; }
+
+  function burst(x, y, type) {
+    const count = type === 'tree' ? 140 : type === 'chrysanthemum' ? 120 : 90;
+    const color = randomColor();
+    const color2 = randomColor();
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      let speed, gravity, fade, size;
+      if (type === 'tree') {
+        speed = (2 + Math.random() * 6) * (Math.random() < 0.3 ? 0.4 : 1);
+        gravity = 0.08; fade = 0.012; size = 2.5 + Math.random() * 2;
+      } else if (type === 'chrysanthemum') {
+        speed = 3 + Math.random() * 5;
+        gravity = 0.03; fade = 0.008; size = 1.5 + Math.random() * 2;
+      } else {
+        speed = 2 + Math.random() * 8;
+        gravity = 0.12; fade = 0.015; size = 2 + Math.random() * 3;
+      }
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed + (Math.random() - 0.5),
+        vy: Math.sin(angle) * speed + (Math.random() - 0.5),
+        color: Math.random() < 0.3 ? color2 : color,
+        alpha: 1, size, gravity, fade,
+        trail: type === 'chrysanthemum',
+        px: x, py: y
+      });
+    }
+  }
+
+  function spawnWave(t) {
+    const w = canvas.width, h = canvas.height;
+    const count = 6 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < count; i++) {
+      const x = w * (0.1 + Math.random() * 0.8);
+      const y = h * (0.05 + Math.random() * 0.6);
+      const types = ['standard','tree','chrysanthemum'];
+      burst(x, y, types[Math.floor(Math.random() * types.length)]);
+    }
+  }
+
+  let lastSpawn = 0;
+  const spawnInterval = 280;
+
+  function frame(ts) {
+    if (!startTime) startTime = ts;
+    const elapsed = ts - startTime;
+    if (elapsed > DURATION) {
+      canvas.style.display = 'none';
+      return;
+    }
+
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (ts - lastSpawn > spawnInterval) {
+      spawnWave(elapsed);
+      lastSpawn = ts;
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.px = p.x; p.py = p.y;
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.vy += p.gravity;
+      p.vx *= 0.98;
+      p.alpha -= p.fade;
+      if (p.alpha <= 0) { particles.splice(i, 1); continue; }
+      ctx.save();
+      ctx.globalAlpha = p.alpha;
+      if (p.trail) {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.size * 0.5;
+        ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.alpha, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
 }
 </script>
 </body>
