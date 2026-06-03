@@ -651,6 +651,11 @@ def compare_stats():
     return jsonify({"runs": len(comparisons), "presets": result})
 
 
+@app.route("/proto")
+def proto_view():
+    return PROTO_HTML
+
+
 @app.route("/health")
 def health():
     return jsonify({"ok": True, "model": MODEL,
@@ -764,6 +769,220 @@ LOGIN_HTML = """<!DOCTYPE html>
   </script>
 </body>
 </html>""".replace('__SUPABASE_URL__', SUPABASE_URL).replace('__SUPABASE_KEY__', SUPABASE_ANON)
+
+# ── PROTO HTML ────────────────────────────────────────────────────────────────
+
+PROTO_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>GAIN — Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#060A0F;font-family:'Inter',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;color:#D8EAF8;user-select:none;}
+.hdr{height:64px;display:flex;align-items:center;padding:0 24px;border-bottom:1px solid #162030;flex-shrink:0;background:#030507;position:relative;}
+.brand{font-family:'Abril Fatface',serif;font-size:42px;letter-spacing:.06em;background:linear-gradient(130deg,#00E8FF,#A0C8FF,#C0A0FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 8px rgba(0,200,255,.5));}
+.hdr-center{position:absolute;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;}
+.hdr-lbl{font-size:9px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#00DDD4;opacity:.9;}
+.hdr-vals{font-size:11px;color:#D8EAF8;letter-spacing:.04em;margin-top:2px;}
+.proto-tag{margin-left:auto;font-size:9px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:rgba(217,70,239,.7);border:1px solid rgba(217,70,239,.35);padding:5px 12px;border-radius:3px;}
+.stage{flex:1;display:flex;min-height:0;}
+.col{flex:1;display:flex;flex-direction:column;border-right:1px solid #162030;padding:16px 14px 12px;min-width:0;position:relative;}
+.col:last-child{border-right:none;}
+.col-accent{height:3px;border-radius:2px;margin-bottom:10px;flex-shrink:0;}
+.t1 .col-accent,.t3 .col-accent{background:linear-gradient(90deg,#008880,#00C8C0);box-shadow:0 0 8px rgba(0,200,192,.5);}
+.t2 .col-accent,.t4 .col-accent{background:linear-gradient(90deg,#6030B0,#8B5CF6);box-shadow:0 0 8px rgba(139,92,246,.5);}
+.col-name{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#405870;margin-bottom:8px;flex-shrink:0;}
+.col-flbl{font-size:20px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#00DDD4;text-align:center;margin-bottom:10px;flex-shrink:0;text-shadow:0 0 12px rgba(0,220,212,.4);}
+.t2 .col-flbl,.t4 .col-flbl{color:#A78BFA;text-shadow:0 0 12px rgba(167,139,250,.4);}
+.col-fader{flex:1;display:flex;justify-content:center;position:relative;min-height:0;}
+.f-track{width:34px;height:100%;background:linear-gradient(180deg,#010204,#020406,#010204);border:1px solid #080F18;border-left-color:#050C14;border-right-color:#050C14;border-radius:3px;position:relative;cursor:ns-resize;touch-action:none;box-shadow:inset 0 8px 16px rgba(0,0,0,1),inset 2px 0 6px rgba(0,0,0,.85),inset -2px 0 6px rgba(0,0,0,.85),0 0 0 1px rgba(0,196,232,.03);}
+.f-fill{position:absolute;bottom:0;left:0;right:0;border-radius:2px;pointer-events:none;transition:box-shadow .38s;}
+.t1 .f-fill,.t3 .f-fill{background:linear-gradient(0deg,rgba(0,160,152,.08),rgba(0,210,200,.32),rgba(0,255,245,.64));box-shadow:0 0 10px rgba(0,196,192,.35),0 0 24px rgba(0,180,175,.12);}
+.t2 .f-fill,.t4 .f-fill{background:linear-gradient(0deg,rgba(80,30,180,.08),rgba(140,80,240,.32),rgba(180,128,255,.64));box-shadow:0 0 10px rgba(139,92,246,.35),0 0 24px rgba(139,92,246,.12);}
+.f-thumb{position:absolute;width:110px;height:60px;left:50%;transform:translateX(-50%);cursor:ns-resize;z-index:3;touch-action:none;border-radius:5px;background:linear-gradient(180deg,#EEF6FF 0%,#C8DCEE 4%,#587890 16%,#283E50 34%,#0E1C28 47%,#0A1620 50%,#0E1C28 53%,#283E50 66%,#587890 84%,#C8DCEE 96%,#EEF6FF 100%);border:1px solid #060E18;border-top-color:#FFFFFF;box-shadow:0 4px 18px rgba(0,0,0,.98),0 0 24px rgba(0,196,232,.4),0 0 0 2px rgba(0,220,255,.25),inset 0 3px 0 rgba(255,255,255,.3);}
+.f-thumb::before,.f-thumb::after{content:'';position:absolute;left:14%;right:14%;height:1px;background:linear-gradient(90deg,transparent,rgba(0,0,0,.4) 25%,rgba(0,0,0,.4) 75%,transparent);}
+.f-thumb::before{top:calc(50% - 5px);}
+.f-thumb::after{top:calc(50% + 5px);}
+.f-center{position:absolute;left:10%;right:10%;top:50%;height:2px;transform:translateY(-50%);background:linear-gradient(90deg,transparent,rgba(0,215,255,.9) 12%,rgba(0,250,255,1) 50%,rgba(0,215,255,.9) 88%,transparent);box-shadow:0 0 8px rgba(0,210,255,.9),0 0 18px rgba(0,200,255,.5);border-radius:1px;}
+.col-fval{font-size:18px;font-weight:900;text-align:center;color:#00DDD4;margin-top:8px;flex-shrink:0;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(0,200,192,.4);}
+.t2 .col-fval,.t4 .col-fval{color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,.4);}
+.col-btns{display:flex;flex-direction:column;gap:5px;margin-top:10px;flex-shrink:0;}
+.col-btn{height:40px;border-radius:3px;border:1px solid #1E2E40;background:linear-gradient(180deg,#04080E,#060C14);color:#6A8AA8;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .1s;font-family:'Inter',sans-serif;}
+.col-btn:hover{border-color:#00DDD4;color:#10F2E8;background:#0B1018;}
+.col-btn.active{background:linear-gradient(180deg,#002830,#001820);color:#20F8EE;border-color:#00DDD4;text-shadow:0 0 8px rgba(0,248,238,1),0 0 18px rgba(0,220,212,.6);box-shadow:inset 0 0 10px rgba(0,221,212,.08),0 0 6px rgba(0,221,212,.2);}
+.col-btn.mute-btn{border-color:rgba(200,70,70,.2);color:rgba(190,90,90,.5);}
+.col-btn.mute-btn.active{background:linear-gradient(180deg,#1E0808,#120404);color:#D07070;border-color:rgba(200,60,60,.6);text-shadow:0 0 8px rgba(220,70,70,.7);}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="brand">GAIN</div>
+  <div class="hdr-center">
+    <div class="hdr-lbl">Current Settings</div>
+    <div class="hdr-vals" id="hdr-vals">—</div>
+  </div>
+  <div class="proto-tag">PROTOTYPE</div>
+</div>
+<div class="stage">
+  <div class="col t1">
+    <div class="col-accent"></div>
+    <div class="col-name">Track 1 — MODE</div>
+    <div class="col-flbl">EFFORT</div>
+    <div class="col-fader">
+      <div class="f-track" id="ft-intensity">
+        <div class="f-fill" id="ff-intensity"></div>
+        <div class="f-thumb" id="fth-intensity"><div class="f-center"></div></div>
+      </div>
+    </div>
+    <div class="col-fval" id="fv-intensity">0.50</div>
+    <div class="col-btns">
+      <button class="col-btn" data-field="mode" data-val="EXPLORE" onclick="toggleBtn('mode','EXPLORE')">EXPLORE</button>
+      <button class="col-btn mute-btn" id="mbtn-t1" onclick="toggleTrack('t1')">MUTE</button>
+      <button class="col-btn" data-field="mode" data-val="BUILD" onclick="toggleBtn('mode','BUILD')">BUILD</button>
+    </div>
+  </div>
+  <div class="col t2">
+    <div class="col-accent"></div>
+    <div class="col-name">Track 2 — CONFIDENCE</div>
+    <div class="col-flbl">CONFIDENCE</div>
+    <div class="col-fader">
+      <div class="f-track" id="ft-certainty">
+        <div class="f-fill" id="ff-certainty"></div>
+        <div class="f-thumb" id="fth-certainty"><div class="f-center"></div></div>
+      </div>
+    </div>
+    <div class="col-fval" id="fv-certainty">0.50</div>
+    <div class="col-btns">
+      <button class="col-btn" data-field="stance" data-val="LIST" onclick="toggleBtn('stance','LIST')">LIST</button>
+      <button class="col-btn mute-btn" id="mbtn-t2" onclick="toggleTrack('t2')">MUTE</button>
+      <button class="col-btn" data-field="stance" data-val="DECIDE" onclick="toggleBtn('stance','DECIDE')">DECIDE</button>
+    </div>
+  </div>
+  <div class="col t3">
+    <div class="col-accent"></div>
+    <div class="col-name">Track 3 — SCOPE</div>
+    <div class="col-flbl">ZOOM LEVEL</div>
+    <div class="col-fader">
+      <div class="f-track" id="ft-scope">
+        <div class="f-fill" id="ff-scope"></div>
+        <div class="f-thumb" id="fth-scope"><div class="f-center"></div></div>
+      </div>
+    </div>
+    <div class="col-fval" id="fv-scope">0.50</div>
+    <div class="col-btns">
+      <button class="col-btn" data-field="filter" data-val="FILE" onclick="toggleBtn('filter','FILE')">FILE</button>
+      <button class="col-btn mute-btn" id="mbtn-t3" onclick="toggleTrack('t3')">MUTE</button>
+      <button class="col-btn" data-field="filter" data-val="PROJECT" onclick="toggleBtn('filter','PROJECT')">PROJECT</button>
+    </div>
+  </div>
+  <div class="col t4">
+    <div class="col-accent"></div>
+    <div class="col-name">Track 4 — VOICE</div>
+    <div class="col-flbl">VERBOSITY</div>
+    <div class="col-fader">
+      <div class="f-track" id="ft-room">
+        <div class="f-fill" id="ff-room"></div>
+        <div class="f-thumb" id="fth-room"><div class="f-center"></div></div>
+      </div>
+    </div>
+    <div class="col-fval" id="fv-room">0.50</div>
+    <div class="col-btns">
+      <button class="col-btn" data-field="voice" data-val="DIRECT" onclick="toggleBtn('voice','DIRECT')">DIRECT</button>
+      <button class="col-btn mute-btn" id="mbtn-t4" onclick="toggleTrack('t4')">MUTE</button>
+      <button class="col-btn" data-field="voice" data-val="OPEN" onclick="toggleBtn('voice','OPEN')">OPEN</button>
+    </div>
+  </div>
+</div>
+<script>
+const THUMB_H=60,FINE_MULT=0.25;
+const FADERS={
+  intensity:{fill:'ff-intensity',thumb:'fth-intensity',val:'fv-intensity',track:'ft-intensity'},
+  certainty:{fill:'ff-certainty',thumb:'fth-certainty',val:'fv-certainty',track:'ft-certainty'},
+  scope:    {fill:'ff-scope',    thumb:'fth-scope',    val:'fv-scope',    track:'ft-scope'},
+  room:     {fill:'ff-room',     thumb:'fth-room',     val:'fv-room',     track:'ft-room'},
+};
+let lastState={};
+const dragging=new Set();
+function getR(id){const e=document.getElementById(id);return e?Math.max(20,e.offsetHeight-THUMB_H):80;}
+function setFader(field,v){
+  const f=FADERS[field];if(!f)return;
+  const r=getR(f.track);
+  document.getElementById(f.fill).style.height=(v*100)+'%';
+  document.getElementById(f.thumb).style.bottom=(v*r)+'px';
+  document.getElementById(f.val).textContent=v.toFixed(2);
+}
+function applyState(s){
+  lastState=s;
+  Object.keys(FADERS).forEach(f=>{if(!dragging.has(f))setFader(f,s[f]??0.5);});
+  document.querySelectorAll('.col-btn[data-field]').forEach(b=>
+    b.classList.toggle('active',b.dataset.val===s[b.dataset.field]));
+  ['t1','t2','t3','t4'].forEach(t=>{
+    const btn=document.getElementById('mbtn-'+t);
+    if(btn)btn.classList.toggle('active',s[t+'_on']===false);
+  });
+  const tk=(l,b,v)=>b?l+': '+b+' · '+v:l+': '+v;
+  document.getElementById('hdr-vals').textContent=[
+    tk('MODE',s.mode,(s.intensity??0.5).toFixed(2)),
+    tk('CONFIDENCE',s.stance,(s.certainty??0.5).toFixed(2)),
+    tk('SCOPE',s.filter,(s.scope??0.5).toFixed(2)),
+    tk('VOICE',s.voice,(s.room??0.5).toFixed(2)),
+  ].join('  ·  ');
+}
+async function set(f,v){await fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[f]:v})});}
+function toggleBtn(field,val){
+  const nv=lastState[field]===val?'':val;
+  lastState[field]=nv;
+  document.querySelectorAll('.col-btn[data-field="'+field+'"]').forEach(b=>b.classList.toggle('active',b.dataset.val===nv));
+  set(field,nv);
+}
+function toggleTrack(t){
+  const key=t+'_on',nv=lastState[key]===false?true:false;
+  lastState[key]=nv;
+  const btn=document.getElementById('mbtn-'+t);
+  if(btn)btn.classList.toggle('active',!nv);
+  set(key,nv);
+}
+const es=new EventSource('/stream');
+es.onmessage=e=>applyState(JSON.parse(e.data));
+Object.entries(FADERS).forEach(([field,ids])=>{
+  const trackEl=document.getElementById(ids.track);
+  const thumbEl=document.getElementById(ids.thumb);
+  if(!trackEl||!thumbEl)return;
+  const getV=()=>parseFloat(document.getElementById(ids.val).textContent);
+  function onDown(e){
+    const cap=e.currentTarget;
+    e.preventDefault();e.stopPropagation();
+    try{cap.setPointerCapture(e.pointerId);}catch(_){}
+    dragging.add(field);
+    const r=Math.max(20,trackEl.offsetHeight-THUMB_H);
+    let prevY=e.clientY;
+    function onMove(ev){
+      const fine=ev.shiftKey?FINE_MULT:1;
+      setFader(field,Math.max(0,Math.min(1,getV()+(-(ev.clientY-prevY)/r*fine))));
+      prevY=ev.clientY;
+    }
+    function onUp(){
+      dragging.delete(field);
+      cap.removeEventListener('pointermove',onMove);
+      cap.removeEventListener('pointerup',onUp);
+      cap.removeEventListener('pointercancel',onUp);
+      set(field,Math.round(getV()*1000)/1000);
+    }
+    cap.addEventListener('pointermove',onMove);
+    cap.addEventListener('pointerup',onUp);
+    cap.addEventListener('pointercancel',onUp);
+  }
+  trackEl.addEventListener('pointerdown',onDown);
+  thumbEl.addEventListener('pointerdown',onDown);
+  [trackEl,thumbEl].forEach(el=>el.addEventListener('dblclick',()=>{setFader(field,0.5);set(field,0.5);}));
+});
+</script>
+</body>
+</html>"""
+
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
@@ -1296,8 +1515,17 @@ body.light .panel-hd{
 .console.compact .fader-wrap{max-height:none;}
 .console.compact .fader-lbl{font-size:22px;letter-spacing:.08em;font-weight:900;}
 .console.compact .fader-val{font-size:18px;font-weight:900;}
-.console.compact .fader-track{width:20px;}
-.console.compact .fader-thumb{width:96px;height:56px;}
+.console.compact .fader-track{width:36px;}
+.console.compact .fader-thumb{
+  width:120px;height:64px;
+  border-top-color:#FFFFFF;
+  box-shadow:
+    0 4px 20px rgba(0,0,0,.98),
+    0 0 28px rgba(0,196,232,.45),
+    0 0 56px rgba(0,196,232,.18),
+    0 0 0 2px rgba(0,220,255,.3),
+    inset 0 3px 0 rgba(255,255,255,.35);
+}
 
 /* Knob — larger, grouped with buttons, section border above */
 .console.compact .knob-wrap{padding:14px 0 12px;border-top:2px solid rgba(0,200,192,.18);}
