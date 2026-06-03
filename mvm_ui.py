@@ -1276,23 +1276,30 @@ body.light .panel-hd{
 .console.compact .channel-bank{width:auto;flex:1;}
 .console.compact .channel-bank.right{border-left:1px solid var(--border);}
 
-/* Scale everything up for full-screen compact view */
+/* Fader — remove height cap, let it dominate */
+.console.compact .fader-wrap{max-height:none;}
+.console.compact .fader-lbl{font-size:22px;letter-spacing:.08em;font-weight:900;}
+.console.compact .fader-val{font-size:18px;font-weight:900;}
+.console.compact .fader-track{width:20px;}
+.console.compact .fader-thumb{width:96px;height:56px;}
+
+/* Knob — larger, grouped with buttons, section border above */
+.console.compact .knob-wrap{padding:14px 0 12px;border-top:2px solid rgba(0,200,192,.18);}
+.console.compact .knob{width:80px;height:80px;}
+.console.compact .knob-body{inset:8px;}
+.console.compact .knob-dot{width:4px;height:19px;top:9px;transform-origin:50% 31px;}
+.console.compact .knob-lbl{font-size:15px;letter-spacing:.1em;font-weight:800;}
+.console.compact .knob-val{font-size:15px;font-weight:900;}
+
+/* Buttons — kill the floating dead space, section border above */
+.console.compact .ch-btns{margin-top:0;gap:6px;padding-top:10px;border-top:2px solid rgba(0,200,192,.1);}
+.console.compact .ch-btn{height:40px;font-size:14px;letter-spacing:.1em;}
+
+/* Track headers and misc */
 .console.compact .bank-hd{font-size:12px;padding:6px 16px;}
-.console.compact .ch{padding:16px 12px 12px;gap:2px;}
-.console.compact .ch-id{font-size:14px;letter-spacing:.1em;}
+.console.compact .ch{padding:14px 12px 10px;gap:0;}
+.console.compact .ch-id{font-size:15px;letter-spacing:.08em;}
 .console.compact .ch-pwr{width:28px;height:28px;font-size:13px;}
-.console.compact .fader-lbl{font-size:14px;letter-spacing:.16em;font-weight:800;}
-.console.compact .fader-val{font-size:14px;font-weight:800;}
-.console.compact .fader-track{width:18px;}
-.console.compact .fader-thumb{width:88px;height:54px;}
-.console.compact .knob{width:62px;height:62px;}
-.console.compact .knob-body{inset:7px;}
-.console.compact .knob-dot{width:4px;height:17px;top:8px;transform-origin:50% 23px;}
-.console.compact .knob-lbl{font-size:13px;letter-spacing:.14em;font-weight:800;}
-.console.compact .knob-val{font-size:13px;font-weight:800;}
-.console.compact .knob-wrap{padding:12px 0 10px;}
-.console.compact .ch-btn{height:44px;font-size:14px;letter-spacing:.12em;}
-.console.compact .ch-btns{gap:6px;padding-top:8px;}
 
 /* Collapse tab — sits between left and right bank in compact mode */
 .collapse-tab{
