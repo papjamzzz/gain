@@ -120,10 +120,10 @@ Production: gain.creativekonsoles.com
 - [x] GAIN all-caps, 72px header
 - [x] State resets to neutral on every server start
 - [x] Screen-recording optimized typography
+- [x] Supabase auth (login/signup) + cloud state/presets
+- [x] Stripe billing — webhook, subscriber DB, plan gate on Compare (free: 5, base: 100/mo, foundational: unlimited)
 
 ### Next
-- [ ] Clerk auth (login/signup)
-- [ ] Supabase (cloud state + presets)
 - [ ] Stripe billing tier wiring
 - [ ] Model selector dial
 

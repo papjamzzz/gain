@@ -7,9 +7,13 @@ import os
 import signal
 import importlib.util
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, Response, request, jsonify, redirect, url_for
 from functools import wraps
+import sqlite3
+import uuid
+import hashlib
+import hmac as _hmac
 
 try:
     from dotenv import load_dotenv
@@ -215,6 +219,94 @@ def write_state(state: dict, user_id: str = None) -> None:
 SUPABASE_URL     = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON    = os.environ.get("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE = os.environ.get("SUPABASE_SERVICE_KEY", "")
+
+STRIPE_SECRET_KEY     = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+# ── Subscriber DB ──────────────────────────────────────────────────────────────
+
+SUBSCRIBERS_DB = Path.home() / ".streamfader" / "subscribers.db"
+
+def _init_subscribers_db():
+    SUBSCRIBERS_DB.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(SUBSCRIBERS_DB) as db:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS subscribers (
+                email               TEXT PRIMARY KEY,
+                plan                TEXT    DEFAULT 'free',
+                usage_count         INTEGER DEFAULT 0,
+                monthly_limit       INTEGER DEFAULT 5,
+                reset_date          TEXT,
+                stripe_customer_id  TEXT
+            )
+        """)
+        db.commit()
+
+_init_subscribers_db()
+
+
+def _get_user_info(token: str):
+    """Return (user_id, email) from Supabase JWT. Returns (None, None) on failure."""
+    if not token or not SUPABASE_URL:
+        return None, None
+    try:
+        import requests as _req
+        r = _req.get(f"{SUPABASE_URL}/auth/v1/user",
+                     headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON},
+                     timeout=4)
+        if r.status_code == 200:
+            data = r.json()
+            return data.get("id"), data.get("email")
+    except Exception:
+        pass
+    return None, None
+
+
+def _get_plan(email: str) -> dict:
+    """Return subscriber record for email, auto-resetting monthly usage if past reset_date."""
+    try:
+        with sqlite3.connect(SUBSCRIBERS_DB) as db:
+            db.row_factory = sqlite3.Row
+            row = db.execute("SELECT * FROM subscribers WHERE email=?", (email,)).fetchone()
+            if row:
+                row = dict(row)
+                if row["reset_date"] and row["plan"] not in ("free", "cancelled"):
+                    reset = datetime.fromisoformat(row["reset_date"])
+                    if datetime.utcnow() > reset:
+                        new_reset = (datetime.utcnow() + timedelta(days=30)).isoformat()
+                        with sqlite3.connect(SUBSCRIBERS_DB) as db2:
+                            db2.execute(
+                                "UPDATE subscribers SET usage_count=0, reset_date=? WHERE email=?",
+                                (new_reset, email))
+                            db2.commit()
+                        row["usage_count"] = 0
+                        row["reset_date"]  = new_reset
+                return row
+    except Exception:
+        pass
+    return {"email": email, "plan": "free", "usage_count": 0, "monthly_limit": 5, "reset_date": None}
+
+
+def _check_and_increment(email: str):
+    """Check plan limit and increment usage. Returns (allowed: bool, error_code: str)."""
+    plan  = _get_plan(email)
+    limit = plan["monthly_limit"]
+    used  = plan["usage_count"]
+    if limit != -1 and used >= limit:
+        return False, "free_limit" if plan["plan"] == "free" else "plan_limit"
+    try:
+        with sqlite3.connect(SUBSCRIBERS_DB) as db:
+            db.execute("""
+                INSERT INTO subscribers (email, plan, usage_count, monthly_limit, reset_date)
+                VALUES (?, ?, 1, ?, ?)
+                ON CONFLICT(email) DO UPDATE SET usage_count = usage_count + 1
+            """, (email, plan["plan"], limit,
+                  plan.get("reset_date") or (datetime.utcnow() + timedelta(days=30)).isoformat()))
+            db.commit()
+    except Exception:
+        pass
+    return True, ""
+
 
 def require_auth(f):
     """Validate Supabase JWT from Authorization header or cookie."""
@@ -482,6 +574,22 @@ COMPARE_LOG = Path.home() / ".streamfader" / "comparisons.json"
 
 @app.route("/compare", methods=["POST"])
 def compare_presets():
+    # ── Plan gate ──────────────────────────────────────────────────────────
+    if SUPABASE_URL:
+        token = _token_from_request()
+        _, email = _get_user_info(token)
+        if not email:
+            return jsonify({"error": "unauthorized"}), 401
+        allowed, err = _check_and_increment(email)
+        if not allowed:
+            plan = _get_plan(email)
+            return jsonify({
+                "error": "limit_reached",
+                "plan":  plan["plan"],
+                "usage": plan["usage_count"],
+                "limit": plan["monthly_limit"],
+            }), 402
+    # ──────────────────────────────────────────────────────────────────────
     data     = request.get_json() or {}
     preset_a = data.get("preset_a", "").strip()
     preset_b = data.get("preset_b", "").strip()
@@ -651,6 +759,94 @@ def compare_stats():
     return jsonify({"runs": len(comparisons), "presets": result})
 
 
+# ── Billing ────────────────────────────────────────────────────────────────────
+
+@app.route("/billing/status")
+def billing_status():
+    if not SUPABASE_URL:
+        return jsonify({"plan": "local", "usage": 0, "limit": -1})
+    token = _token_from_request()
+    _, email = _get_user_info(token)
+    if not email:
+        return jsonify({"error": "unauthorized"}), 401
+    plan = _get_plan(email)
+    return jsonify({
+        "plan":  plan["plan"],
+        "usage": plan["usage_count"],
+        "limit": plan["monthly_limit"],
+        "email": email,
+    })
+
+
+@app.route("/webhook/stripe", methods=["POST"])
+def stripe_webhook():
+    payload    = request.get_data()
+    sig_header = request.headers.get("Stripe-Signature", "")
+
+    if STRIPE_WEBHOOK_SECRET:
+        try:
+            parts    = dict(p.split("=", 1) for p in sig_header.split(","))
+            ts       = parts.get("t", "")
+            v1       = parts.get("v1", "")
+            signed   = ts.encode() + b"." + payload
+            expected = _hmac.new(STRIPE_WEBHOOK_SECRET.encode(), signed, hashlib.sha256).hexdigest()
+            if not _hmac.compare_digest(expected, v1):
+                return jsonify({"error": "invalid signature"}), 400
+        except Exception:
+            return jsonify({"error": "signature error"}), 400
+
+    event      = request.get_json(force=True)
+    event_type = (event or {}).get("type", "")
+    if not event:
+        return jsonify({"ok": True}), 200
+
+    if event_type == "customer.subscription.deleted":
+        sub         = event["data"]["object"]
+        customer_id = sub.get("customer", "")
+        try:
+            with sqlite3.connect(SUBSCRIBERS_DB) as db:
+                db.execute(
+                    "UPDATE subscribers SET monthly_limit=0, plan='cancelled' WHERE stripe_customer_id=?",
+                    (customer_id,))
+                db.commit()
+        except Exception as e:
+            print(f"[STRIPE CANCEL] {e}")
+        return jsonify({"ok": True}), 200
+
+    if event_type != "checkout.session.completed":
+        return jsonify({"ok": True}), 200
+
+    obj         = event["data"]["object"]
+    email       = obj.get("customer_details", {}).get("email", "")
+    customer_id = obj.get("customer", "")
+    metadata    = obj.get("metadata", {})
+    plan_key    = metadata.get("plan", "base")
+
+    if plan_key == "foundational":
+        monthly_limit = -1
+    else:
+        monthly_limit = 100
+
+    reset_date = (datetime.utcnow() + timedelta(days=30)).isoformat()
+
+    try:
+        with sqlite3.connect(SUBSCRIBERS_DB) as db:
+            db.execute("""
+                INSERT INTO subscribers (email, plan, usage_count, monthly_limit, reset_date, stripe_customer_id)
+                VALUES (?, ?, 0, ?, ?, ?)
+                ON CONFLICT(email) DO UPDATE SET
+                    plan=excluded.plan, monthly_limit=excluded.monthly_limit,
+                    reset_date=excluded.reset_date, stripe_customer_id=excluded.stripe_customer_id,
+                    usage_count=0
+            """, (email, plan_key, monthly_limit, reset_date, customer_id))
+            db.commit()
+        print(f"[STRIPE] New subscriber: {email} → {plan_key}")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"ok": True}), 200
+
+
 @app.route("/proto")
 def proto_view():
     return PROTO_HTML
@@ -802,16 +998,18 @@ body.light .col-flbl{color:#007E78;text-shadow:0 0 1px rgba(0,220,200,1),0 0 4px
 body.light .t2 .col-flbl,body.light .t4 .col-flbl{color:#6D28D9;text-shadow:0 0 4px rgba(109,40,217,.4);}
 body.light .col-fval{color:#007E78;text-shadow:0 0 8px rgba(0,158,150,.5);}
 body.light .t2 .col-fval,body.light .t4 .col-fval{color:#6D28D9;text-shadow:0 0 4px rgba(109,40,217,.3);}
-body.light .f-track{background:linear-gradient(90deg,#606058 0%,#7A7870 8%,#989490 20%,#A8A4A0 50%,#989490 80%,#7A7870 92%,#606058 100%);border-color:#585850;box-shadow:inset 0 6px 14px rgba(0,0,0,.5),inset 3px 0 8px rgba(0,0,0,.3),inset -3px 0 8px rgba(0,0,0,.3),inset 0 2px 0 rgba(0,0,0,.4),0 0 0 1px rgba(0,0,0,.12);}
-body.light .t1 .f-fill,body.light .t3 .f-fill{background:linear-gradient(0deg,rgba(0,100,100,.06) 0%,rgba(0,130,125,.18) 35%,rgba(0,155,148,.34) 65%,rgba(0,175,168,.52) 85%,rgba(0,185,178,.68) 100%);box-shadow:0 0 6px rgba(0,130,120,.22);}
-body.light .t2 .f-fill,body.light .t4 .f-fill{background:linear-gradient(0deg,rgba(90,30,160,.05) 0%,rgba(100,40,180,.14) 35%,rgba(115,60,200,.28) 65%,rgba(130,80,220,.44) 85%,rgba(140,95,235,.58) 100%);box-shadow:0 0 6px rgba(109,40,217,.20);}
-body.light .f-thumb{background:linear-gradient(180deg,#FFFFFF 0%,#F4F2EE 3%,#DEDAD4 12%,#B8B4AC 30%,#989490 44%,#888480 50%,#989490 56%,#B8B4AC 70%,#DEDAD4 88%,#F4F2EE 97%,#FFFFFF 100%);border-color:#888480;border-top-color:#FFFFFF;border-bottom-color:#686460;box-shadow:0 4px 14px rgba(0,0,0,.38),0 0 0 1px rgba(0,0,0,.14),inset 0 3px 0 rgba(255,255,255,.85),inset 0 -2px 0 rgba(0,0,0,.18);}
-body.light .f-center{background:linear-gradient(90deg,transparent,rgba(0,140,135,.85) 12%,rgba(0,160,155,1) 50%,rgba(0,140,135,.85) 88%,transparent);box-shadow:0 0 4px rgba(0,140,130,.6),0 0 10px rgba(0,130,120,.25);}
-body.light .col-btn{color:rgba(200,235,245,.85);border-color:rgba(160,210,230,.35);background:rgba(100,180,200,.08);text-shadow:0 0 4px rgba(160,220,240,.3);}
-body.light .col-btn:hover{color:#fff;border-color:rgba(0,220,212,.6);background:rgba(0,180,170,.15);text-shadow:0 0 8px rgba(0,220,212,.6);}
-body.light .col-btn.active{background:rgba(0,126,120,.14);border-color:#007E78;color:#001A14;text-shadow:0 0 1px rgba(0,240,220,1),0 0 5px rgba(0,210,190,.9),0 0 14px rgba(0,190,170,.55);}
-body.light .col-btn.mute-btn{color:rgba(255,160,160,.8);border-color:rgba(200,60,60,.35);background:rgba(180,30,30,.06);}
-body.light .col-btn.mute-btn.active{color:#FF4444;border-color:rgba(220,40,40,.7);background:rgba(160,20,20,.18);text-shadow:0 0 6px rgba(255,60,60,.9);}
+body.light .f-track{background:rgba(200,195,185,.4);border-color:rgba(0,120,115,.22);overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,.08);}
+body.light .t1 .f-fill,body.light .t3 .f-fill{background:linear-gradient(0deg,rgba(0,120,115,.88) 0%,rgba(0,150,145,.68) 45%,rgba(0,175,168,.45) 80%,rgba(0,195,188,.22) 100%);box-shadow:0 0 12px rgba(0,140,135,.25);}
+body.light .t2 .f-fill,body.light .t4 .f-fill{background:linear-gradient(0deg,rgba(100,40,190,.78) 0%,rgba(125,65,215,.58) 45%,rgba(148,98,228,.38) 80%,rgba(168,128,240,.18) 100%);box-shadow:0 0 12px rgba(109,40,217,.18);}
+body.light .f-thumb{width:100%;height:4px;left:0;transform:none;background:transparent;border-color:transparent;box-shadow:none;}
+body.light .t1 .f-thumb,body.light .t3 .f-thumb{background:linear-gradient(90deg,transparent,rgba(0,160,152,.8) 20%,rgba(0,200,193,1) 50%,rgba(0,160,152,.8) 80%,transparent);box-shadow:0 0 5px rgba(0,150,143,.7);}
+body.light .t2 .f-thumb,body.light .t4 .f-thumb{background:linear-gradient(90deg,transparent,rgba(130,70,210,.8) 20%,rgba(155,105,232,1) 50%,rgba(130,70,210,.8) 80%,transparent);box-shadow:0 0 5px rgba(109,40,217,.6);}
+body.light .f-center{display:none;}
+body.light .col-btn{color:#1A2B3A;border-color:rgba(0,80,120,.28);background:rgba(255,255,255,.75);font-weight:900;text-shadow:none;}
+body.light .col-btn:hover{color:#007E78;border-color:#007E78;background:rgba(0,126,120,.1);text-shadow:none;}
+body.light .col-btn.active{background:rgba(0,126,120,.18);border-color:#007E78;color:#003028;font-weight:900;text-shadow:none;}
+body.light .col-btn.mute-btn{color:#8B2020;border-color:rgba(140,30,30,.38);background:rgba(180,40,40,.08);font-weight:900;}
+body.light .col-btn.mute-btn.active{color:#CC1010;border-color:rgba(200,20,20,.65);background:rgba(160,20,20,.14);text-shadow:none;}
 body.light .t1 .col-accent,body.light .t3 .col-accent{background:linear-gradient(90deg,#005850,#007E78);box-shadow:none;}
 body.light .t2 .col-accent,body.light .t4 .col-accent{background:linear-gradient(90deg,#5020A0,#6D28D9);box-shadow:none;}
 body.light .proto-tag{color:#B020C8;border-color:rgba(176,32,200,.35);}
@@ -841,23 +1039,106 @@ body.light .col-knob-wrap{border-top-color:rgba(0,126,120,.15);}
 .col-flbl{font-size:20px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#00DDD4;text-align:center;margin-bottom:10px;flex-shrink:0;text-shadow:0 0 12px rgba(0,220,212,.4);}
 .t2 .col-flbl,.t4 .col-flbl{color:#A78BFA;text-shadow:0 0 12px rgba(167,139,250,.4);}
 .col-fader{flex:1;display:flex;justify-content:center;position:relative;min-height:0;}
-.f-track{width:34px;height:100%;background:linear-gradient(180deg,#010204,#020406,#010204);border:1px solid #080F18;border-left-color:#050C14;border-right-color:#050C14;border-radius:3px;position:relative;cursor:ns-resize;touch-action:none;box-shadow:inset 0 8px 16px rgba(0,0,0,1),inset 2px 0 6px rgba(0,0,0,.85),inset -2px 0 6px rgba(0,0,0,.85),0 0 0 1px rgba(0,196,232,.03);}
-.f-fill{position:absolute;bottom:0;left:0;right:0;border-radius:2px;pointer-events:none;transition:box-shadow .38s;}
-.t1 .f-fill,.t3 .f-fill{background:linear-gradient(0deg,rgba(0,160,152,.08),rgba(0,210,200,.32),rgba(0,255,245,.64));box-shadow:0 0 10px rgba(0,196,192,.35),0 0 24px rgba(0,180,175,.12);}
-.t2 .f-fill,.t4 .f-fill{background:linear-gradient(0deg,rgba(80,30,180,.08),rgba(140,80,240,.32),rgba(180,128,255,.64));box-shadow:0 0 10px rgba(139,92,246,.35),0 0 24px rgba(139,92,246,.12);}
-.f-thumb{position:absolute;width:110px;height:60px;left:50%;transform:translateX(-50%);cursor:ns-resize;z-index:3;touch-action:none;border-radius:5px;background:linear-gradient(180deg,#EEF6FF 0%,#C8DCEE 4%,#587890 16%,#283E50 34%,#0E1C28 47%,#0A1620 50%,#0E1C28 53%,#283E50 66%,#587890 84%,#C8DCEE 96%,#EEF6FF 100%);border:1px solid #060E18;border-top-color:#FFFFFF;box-shadow:0 4px 18px rgba(0,0,0,.98),0 0 24px rgba(0,196,232,.4),0 0 0 2px rgba(0,220,255,.25),inset 0 3px 0 rgba(255,255,255,.3);}
-.f-thumb::before,.f-thumb::after{content:'';position:absolute;left:14%;right:14%;height:1px;background:linear-gradient(90deg,transparent,rgba(0,0,0,.4) 25%,rgba(0,0,0,.4) 75%,transparent);}
-.f-thumb::before{top:calc(50% - 5px);}
-.f-thumb::after{top:calc(50% + 5px);}
-.f-center{position:absolute;left:10%;right:10%;top:50%;height:2px;transform:translateY(-50%);background:linear-gradient(90deg,transparent,rgba(0,215,255,.9) 12%,rgba(0,250,255,1) 50%,rgba(0,215,255,.9) 88%,transparent);box-shadow:0 0 8px rgba(0,210,255,.9),0 0 18px rgba(0,200,255,.5);border-radius:1px;}
+.f-track{width:calc(100% - 12px);height:100%;background:rgba(0,6,12,.85);border:1px solid rgba(0,180,172,.16);border-radius:5px;position:relative;cursor:ns-resize;touch-action:none;overflow:hidden;box-shadow:inset 0 4px 20px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.5);}
+.f-fill{position:absolute;bottom:0;left:0;right:0;border-radius:0;pointer-events:none;}
+.t1 .f-fill,.t3 .f-fill{background:linear-gradient(0deg,rgba(0,150,144,.92) 0%,rgba(0,185,178,.76) 35%,rgba(0,215,207,.54) 70%,rgba(0,238,230,.32) 90%,rgba(100,255,250,.14) 100%);box-shadow:0 0 24px rgba(0,200,192,.45),0 0 60px rgba(0,180,175,.15),inset 0 0 30px rgba(0,160,155,.08);}
+.t2 .f-fill,.t4 .f-fill{background:linear-gradient(0deg,rgba(88,28,180,.92) 0%,rgba(120,62,222,.76) 35%,rgba(150,98,242,.54) 70%,rgba(175,135,255,.32) 90%,rgba(210,185,255,.14) 100%);box-shadow:0 0 24px rgba(139,92,246,.45),0 0 60px rgba(139,92,246,.15),inset 0 0 30px rgba(100,60,200,.08);}
+.f-thumb{position:absolute;width:100%;height:4px;left:0;transform:none;cursor:ns-resize;z-index:3;touch-action:none;border-radius:2px;}
+.t1 .f-thumb,.t3 .f-thumb{background:linear-gradient(90deg,transparent,rgba(0,230,222,.65) 18%,rgba(190,255,252,.92) 50%,rgba(0,230,222,.65) 82%,transparent);box-shadow:0 0 10px rgba(0,220,212,1),0 0 22px rgba(0,200,192,.65);}
+.t2 .f-thumb,.t4 .f-thumb{background:linear-gradient(90deg,transparent,rgba(160,128,250,.65) 18%,rgba(225,200,255,.92) 50%,rgba(160,128,250,.65) 82%,transparent);box-shadow:0 0 10px rgba(167,139,250,1),0 0 22px rgba(139,92,246,.65);}
+.f-thumb::before,.f-thumb::after{display:none;}
+.f-center{display:none;}
 .col-fval{font-size:18px;font-weight:900;text-align:center;color:#00DDD4;margin-top:8px;flex-shrink:0;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(0,200,192,.4);}
 .t2 .col-fval,.t4 .col-fval{color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,.4);}
 .col-btns{display:flex;flex-direction:column;gap:5px;margin-top:10px;flex-shrink:0;}
-.col-btn{height:40px;border-radius:3px;border:1px solid #1E2E40;background:linear-gradient(180deg,#04080E,#060C14);color:#6A8AA8;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .1s;font-family:'Inter',sans-serif;}
-.col-btn:hover{border-color:#00DDD4;color:#10F2E8;background:#0B1018;}
+.col-btn{height:40px;border-radius:3px;border:1px solid rgba(60,110,155,.55);background:rgba(12,22,38,.9);color:#C8E2F6;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .1s;font-family:'Inter',sans-serif;}
+.col-btn:hover{border-color:#00DDD4;color:#00F0E6;background:rgba(14,28,48,.95);}
 .col-btn.active{background:linear-gradient(180deg,#002830,#001820);color:#20F8EE;border-color:#00DDD4;text-shadow:0 0 8px rgba(0,248,238,1),0 0 18px rgba(0,220,212,.6);box-shadow:inset 0 0 10px rgba(0,221,212,.08),0 0 6px rgba(0,221,212,.2);}
-.col-btn.mute-btn{border-color:rgba(200,70,70,.2);color:rgba(190,90,90,.5);}
-.col-btn.mute-btn.active{background:linear-gradient(180deg,#1E0808,#120404);color:#D07070;border-color:rgba(200,60,60,.6);text-shadow:0 0 8px rgba(220,70,70,.7);}
+.col-btn.mute-btn{border-color:rgba(200,70,70,.35);color:#C07888;font-weight:900;}
+.col-btn.mute-btn.active{background:linear-gradient(180deg,#1E0808,#120404);color:#E07878;border-color:rgba(200,60,60,.7);text-shadow:0 0 8px rgba(220,70,70,.7);}
+/* ── Header action buttons ── */
+.hdr-action{height:30px;padding:0 12px;border-radius:3px;border:1px solid rgba(0,200,192,.3);background:rgba(0,200,192,.06);color:rgba(0,220,212,.8);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:all .12s;font-family:'Inter',sans-serif;margin-left:6px;flex-shrink:0;}
+.hdr-action:hover{border-color:#00DDD4;color:#00DDD4;background:rgba(0,200,192,.14);}
+.hdr-action.cmp-trigger{border-color:rgba(217,70,239,.4);color:rgba(217,70,239,.85);}
+.hdr-action.cmp-trigger:hover{border-color:#D946EF;color:#D946EF;background:rgba(217,70,239,.1);}
+body.light .hdr-action{border-color:rgba(0,126,120,.3);background:rgba(0,126,120,.05);color:rgba(0,126,120,.8);}
+body.light .hdr-action.cmp-trigger{border-color:rgba(176,32,200,.35);color:rgba(176,32,200,.8);}
+/* ── Bottom bar ── */
+.bottom-bar{flex-shrink:0;border-top:1px solid #162030;background:#030507;padding:10px 16px;display:flex;gap:14px;}
+.bb-col{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0;}
+.bb-lbl{font-size:8px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:rgba(0,200,192,.45);}
+.bb-row{display:flex;gap:6px;}
+.bb-input{flex:1;height:34px;background:rgba(4,8,14,.9);border:1px solid rgba(0,180,172,.2);border-radius:3px;color:#D8EAF8;font-size:12px;font-family:'Inter',sans-serif;padding:0 10px;outline:none;min-width:0;}
+.bb-input:focus{border-color:rgba(0,220,212,.45);}
+.bb-input::placeholder{color:rgba(100,140,165,.35);font-size:11px;}
+.bb-btn{height:34px;padding:0 14px;border-radius:3px;border:1px solid rgba(0,200,192,.32);background:rgba(0,200,192,.07);color:#00DDD4;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:all .12s;font-family:'Inter',sans-serif;flex-shrink:0;}
+.bb-btn:hover{background:rgba(0,200,192,.16);border-color:#00DDD4;}
+.bb-btn:disabled{opacity:.35;cursor:not-allowed;}
+.preset-chips{display:flex;flex-wrap:wrap;gap:4px;min-height:18px;}
+.preset-chip{display:flex;align-items:center;gap:3px;background:#0A141E;border:1px solid #1E2E40;border-radius:2px;padding:2px 4px 2px 7px;cursor:default;transition:border-color .1s;}
+.preset-chip:hover{border-color:rgba(0,200,192,.45);}
+.preset-chip-name{font-size:10px;font-weight:700;color:#90B4C8;letter-spacing:.04em;cursor:pointer;}
+.preset-chip-del{background:none;border:none;color:rgba(140,170,190,.35);font-size:10px;cursor:pointer;padding:0 1px;line-height:1;font-weight:900;}
+.preset-chip-del:hover{color:#FF6060;}
+.preset-empty{font-size:10px;color:rgba(80,120,145,.4);font-style:italic;}
+.run-status{font-size:9px;font-weight:700;letter-spacing:.1em;color:rgba(0,200,192,.5);min-height:13px;}
+.resp-box{background:#040810;border:1px solid #162030;border-radius:3px;padding:9px 11px;font-size:11px;font-family:'JetBrains Mono','Inter',monospace;color:#B8D0E8;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.55;display:none;}
+.resp-box.has-content{display:block;}
+/* ── Compare panel ── */
+.cmp-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;}
+.cmp-overlay.open{display:block;}
+.cmp-panel{position:fixed;bottom:-100%;left:0;right:0;height:72vh;background:#060C14;border-top:2px solid rgba(217,70,239,.4);z-index:101;transition:bottom .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,.8);}
+.cmp-panel.open{bottom:0;}
+.cmp-hd{padding:9px 18px;border-bottom:1px solid #162030;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#030810;}
+.cmp-title{font-size:10px;font-weight:900;letter-spacing:.2em;text-transform:uppercase;color:rgba(217,70,239,.85);}
+.cmp-close{width:22px;height:22px;border:1px solid #1E2E40;background:transparent;cursor:pointer;font-size:11px;color:#6A8AA8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.cmp-close:hover{color:#D946EF;border-color:rgba(217,70,239,.4);}
+.cmp-body{padding:14px 18px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+.cmp-save-row{display:flex;gap:6px;align-items:center;padding-bottom:10px;border-bottom:1px solid #162030;}
+.cmp-save-lbl{font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:rgba(0,200,192,.4);flex-shrink:0;white-space:nowrap;}
+.cmp-save-input{flex:1;height:30px;background:#030810;border:1px solid rgba(0,180,172,.18);border-radius:3px;color:#D8EAF8;font-size:12px;font-family:'Inter',sans-serif;padding:0 8px;outline:none;}
+.cmp-save-input:focus{border-color:rgba(0,220,212,.45);}
+.cmp-save-btn{height:30px;padding:0 11px;border-radius:3px;border:1px solid rgba(0,200,192,.28);background:rgba(0,200,192,.06);color:#00DDD4;font-size:8px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0;}
+.cmp-save-btn:hover{background:rgba(0,200,192,.14);}
+.cmp-save-msg{font-size:9px;font-weight:700;color:rgba(0,200,192,.6);min-height:12px;letter-spacing:.06em;}
+.cmp-sel-row{display:flex;gap:10px;}
+.cmp-sel-group{flex:1;display:flex;flex-direction:column;gap:4px;}
+.cmp-sel-lbl{font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:rgba(0,200,192,.45);}
+.cmp-select{height:32px;background:#030810;border:1px solid rgba(0,180,172,.22);border-radius:3px;color:#D8EAF8;font-size:12px;font-family:'Inter',sans-serif;padding:0 8px;outline:none;}
+.cmp-prompt-row{display:flex;gap:8px;}
+.cmp-prompt-input{flex:1;height:34px;background:#030810;border:1px solid rgba(0,180,172,.18);border-radius:3px;color:#D8EAF8;font-size:12px;font-family:'Inter',sans-serif;padding:0 10px;outline:none;}
+.cmp-prompt-input:focus{border-color:rgba(0,220,212,.45);}
+.cmp-run-btn{height:34px;padding:0 16px;border-radius:3px;border:1px solid rgba(217,70,239,.4);background:rgba(217,70,239,.08);color:rgba(217,70,239,.9);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0;}
+.cmp-run-btn:hover{background:rgba(217,70,239,.18);border-color:#D946EF;}
+.cmp-run-btn:disabled{opacity:.3;cursor:not-allowed;}
+.cmp-status{font-size:9px;font-weight:700;letter-spacing:.1em;color:rgba(0,200,192,.5);min-height:14px;}
+.cmp-outputs{display:flex;gap:10px;flex:1;min-height:0;}
+.cmp-out{flex:1;display:flex;flex-direction:column;gap:4px;min-height:0;}
+.cmp-out-lbl{font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:rgba(0,200,192,.5);flex-shrink:0;}
+.cmp-out-box{flex:1;background:#020810;border:1px solid #162030;border-radius:3px;padding:8px 10px;font-size:11px;font-family:'JetBrains Mono','Inter',monospace;color:#A8C8E0;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.5;}
+.cmp-metrics-wrap{flex-shrink:0;border-top:1px solid #162030;padding-top:10px;display:none;flex-direction:column;gap:4px;}
+.cmp-metrics-wrap.visible{display:flex;}
+.cmp-score-hd{font-size:8px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:rgba(0,200,192,.4);margin-bottom:4px;}
+.cmp-metric-row{display:flex;align-items:center;gap:8px;}
+.cmp-metric-name{font-size:8px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5A7898;width:96px;flex-shrink:0;}
+.cmp-bars{flex:1;display:flex;gap:3px;}
+.cmp-bar{flex:1;height:10px;background:#0A141E;border-radius:2px;overflow:hidden;}
+.cmp-bar-a .cmp-bar-fill{height:100%;background:linear-gradient(90deg,#007E78,#00DDD4);border-radius:2px;}
+.cmp-bar-b .cmp-bar-fill{height:100%;background:linear-gradient(90deg,#5020A0,#A78BFA);border-radius:2px;}
+.cmp-winner{font-size:8px;font-weight:900;color:#00DDD4;width:14px;text-align:center;flex-shrink:0;}
+.cmp-summary{font-size:11px;color:#7A9AB8;line-height:1.6;padding-top:8px;border-top:1px solid #162030;margin-top:6px;flex-shrink:0;}
+/* Light theme overrides */
+body.light .bottom-bar{background:#E8E5E0;border-top-color:rgba(0,0,0,.1);}
+body.light .bb-input{background:rgba(240,237,232,.9);border-color:rgba(0,120,115,.2);color:#1C2B3A;}
+body.light .bb-btn{border-color:rgba(0,126,120,.35);background:rgba(0,126,120,.06);color:#007E78;}
+body.light .bb-lbl{color:rgba(0,126,120,.55);}
+body.light .preset-chip{background:#E2DED8;border-color:rgba(0,0,0,.12);}
+body.light .preset-chip-name{color:#2A4060;}
+body.light .resp-box{background:#F0EDE8;border-color:rgba(0,0,0,.1);color:#1C2B3A;}
+body.light .cmp-panel{background:#F0EDE8;border-top-color:rgba(176,32,200,.35);}
+body.light .cmp-hd{background:#E8E5E0;}
+body.light .cmp-save-input,.body.light .cmp-select,.body.light .cmp-prompt-input{background:#F8F6F2;border-color:rgba(0,120,115,.2);color:#1C2B3A;}
+body.light .cmp-out-box{background:#F8F6F2;border-color:rgba(0,0,0,.1);color:#1C2B3A;}
 </style>
 </head>
 <body>
@@ -867,6 +1148,8 @@ body.light .col-knob-wrap{border-top-color:rgba(0,126,120,.15);}
     <div class="hdr-lbl">Current Settings</div>
     <div class="hdr-vals" id="hdr-vals">—</div>
   </div>
+  <button class="hdr-action" onclick="resetDefaults()">RESET</button>
+  <button class="hdr-action cmp-trigger" onclick="openCompare()">⊕ COMPARE</button>
   <button class="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
   <div class="proto-tag">PROTOTYPE</div>
 </div>
@@ -960,8 +1243,65 @@ body.light .col-knob-wrap{border-top-color:rgba(0,126,120,.15);}
     </div>
   </div>
 </div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <div class="bb-col">
+    <div class="bb-lbl">PRESETS</div>
+    <div class="bb-row">
+      <input class="bb-input" id="preset-input" type="text" placeholder="name this state and save it…" maxlength="40" onkeydown="if(event.key==='Enter')savePreset()">
+      <button class="bb-btn" onclick="savePreset()">SAVE</button>
+    </div>
+    <div class="preset-chips" id="preset-chips"><span class="preset-empty">no presets yet</span></div>
+  </div>
+  <div class="bb-col">
+    <div class="bb-lbl">PREVIEW RUN</div>
+    <div class="bb-row">
+      <input class="bb-input" id="run-input" type="text" placeholder="run a prompt with current settings…" onkeydown="if(event.key==='Enter')runTask()">
+      <button class="bb-btn" id="run-btn" onclick="runTask()">RUN</button>
+    </div>
+    <div class="run-status" id="run-status"></div>
+    <div class="resp-box" id="resp-box"></div>
+  </div>
+</div>
+
+<!-- COMPARE PANEL -->
+<div class="cmp-overlay" id="cmp-overlay" onclick="closeCompare()"></div>
+<div class="cmp-panel" id="cmp-panel">
+  <div class="cmp-hd">
+    <span class="cmp-title">⊕ compare presets</span>
+    <button class="cmp-close" onclick="closeCompare()">✕</button>
+  </div>
+  <div class="cmp-body">
+    <div class="cmp-save-row">
+      <span class="cmp-save-lbl">SAVE CURRENT AS</span>
+      <input class="cmp-save-input" id="cmp-save-input" type="text" placeholder="preset name…" maxlength="40" onkeydown="if(event.key==='Enter')savePresetFrom('cmp-save-input','cmp-save-msg')">
+      <button class="cmp-save-btn" onclick="savePresetFrom('cmp-save-input','cmp-save-msg')">SAVE</button>
+    </div>
+    <div class="cmp-save-msg" id="cmp-save-msg"></div>
+    <div class="cmp-sel-row">
+      <div class="cmp-sel-group"><div class="cmp-sel-lbl">PRESET A</div><select class="cmp-select" id="cmp-select-a"></select></div>
+      <div class="cmp-sel-group"><div class="cmp-sel-lbl">PRESET B</div><select class="cmp-select" id="cmp-select-b"></select></div>
+    </div>
+    <div class="cmp-prompt-row">
+      <input class="cmp-prompt-input" id="cmp-prompt" type="text" placeholder="Enter a prompt to run on both presets…" onkeydown="if(event.key==='Enter')runCompare()">
+      <button class="cmp-run-btn" id="cmp-run-btn" onclick="runCompare()">RUN</button>
+    </div>
+    <div class="cmp-status" id="cmp-status"></div>
+    <div class="cmp-outputs">
+      <div class="cmp-out"><div class="cmp-out-lbl" id="cmp-label-a">PRESET A</div><div class="cmp-out-box" id="cmp-out-a"></div></div>
+      <div class="cmp-out"><div class="cmp-out-lbl" id="cmp-label-b">PRESET B</div><div class="cmp-out-box" id="cmp-out-b"></div></div>
+    </div>
+    <div class="cmp-metrics-wrap" id="cmp-metrics-wrap">
+      <div class="cmp-score-hd">SCORECARD</div>
+      <div id="cmp-metrics"></div>
+      <div class="cmp-summary" id="cmp-summary"></div>
+    </div>
+  </div>
+</div>
+
 <script>
-const THUMB_H=60,FINE_MULT=0.25,KNOB_SENS=0.90,KNOB_DETENT=0.022;
+const THUMB_H=4,FINE_MULT=0.25,KNOB_SENS=0.90,KNOB_DETENT=0.022;
 const FADERS={
   intensity:{fill:'ff-intensity',thumb:'fth-intensity',val:'fv-intensity',track:'ft-intensity'},
   certainty:{fill:'ff-certainty',thumb:'fth-certainty',val:'fv-certainty',track:'ft-certainty'},
@@ -1103,6 +1443,142 @@ Object.entries(KNOBS).forEach(([field,ids])=>{
   knobEl.addEventListener('pointerdown',onDown);
   knobEl.addEventListener('dblclick',()=>{setKnob(field,0.5);set(field,0.5);});
 });
+// ── Presets ────────────────────────────────────────────────────────
+async function savePreset(){
+  const inp=document.getElementById('preset-input');
+  const name=(inp?inp.value:'').trim();
+  if(!name){if(inp)inp.focus();return;}
+  await fetch('/presets/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if(inp)inp.value='';
+  loadPresets();
+}
+async function savePresetFrom(inputId,msgId){
+  const inp=document.getElementById(inputId);
+  const name=(inp?inp.value:'').trim();
+  if(!name){if(inp)inp.focus();return;}
+  await fetch('/presets/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  if(inp)inp.value='';
+  const m=document.getElementById(msgId);
+  if(m){m.textContent='Saved: '+name;setTimeout(()=>m.textContent='',2200);}
+  loadPresets();
+}
+async function loadPreset(name){
+  await fetch('/presets/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+}
+async function deletePreset(name){
+  await fetch('/presets/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  loadPresets();
+}
+async function loadPresets(){
+  let presets=[];
+  try{const r=await fetch('/presets');presets=await r.json();}catch(_){}
+  const chips=document.getElementById('preset-chips');
+  if(chips){
+    if(!presets.length){chips.innerHTML='<span class="preset-empty">no presets yet</span>';}
+    else{chips.innerHTML=presets.map(p=>`<div class="preset-chip"><span class="preset-chip-name" onclick="loadPreset('${p.name.replace(/'/g,"\\\'")}')">${p.name}</span><button class="preset-chip-del" onclick="deletePreset('${p.name.replace(/'/g,"\\\'")}')" title="delete">✕</button></div>`).join('');}
+  }
+  ['cmp-select-a','cmp-select-b'].forEach((id,i)=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const prev=sel.value;
+    sel.innerHTML='<option value="__current__">— Current Settings —</option>'+presets.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+    if(prev&&[...sel.options].some(o=>o.value===prev))sel.value=prev;
+    else if(i===1&&presets.length)sel.value=presets[0].name;
+  });
+}
+function resetDefaults(){
+  const n={intensity:0.5,depth:0.5,certainty:0.5,risk:0.5,scope:0.5,bandwidth:0.5,room:0.5,decay:0.5,mode:'',stance:'',filter:'',voice:'',t1_on:true,t2_on:true,t3_on:true,t4_on:true};
+  fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(n)});
+}
+// ── Preview Run ─────────────────────────────────────────────────────
+async function runTask(){
+  const inp=document.getElementById('run-input');
+  const task=(inp?inp.value:'').trim();
+  if(!task){if(inp)inp.focus();return;}
+  const btn=document.getElementById('run-btn');
+  const status=document.getElementById('run-status');
+  const box=document.getElementById('resp-box');
+  if(btn)btn.disabled=true;
+  if(status)status.textContent='● RUNNING…';
+  if(box){box.textContent='';box.classList.remove('has-content');}
+  try{
+    const resp=await fetch('/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task})});
+    const reader=resp.body.getReader();const dec=new TextDecoder();let buf='';
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\\n');buf=lines.pop();
+      for(const line of lines){
+        if(!line.startsWith('data:'))continue;
+        try{
+          const d=JSON.parse(line.slice(5).trim());
+          if(d.text&&box){box.textContent+=d.text;box.classList.add('has-content');}
+          if(d.done&&status)status.textContent='';
+          if(d.error&&status)status.textContent='✕ '+d.error;
+        }catch(_){}
+      }
+    }
+  }catch(e){if(status)status.textContent='✕ '+e.message;}
+  if(btn)btn.disabled=false;
+}
+// ── Compare ─────────────────────────────────────────────────────────
+function openCompare(){loadPresets();document.getElementById('cmp-panel').classList.add('open');document.getElementById('cmp-overlay').classList.add('open');}
+function closeCompare(){document.getElementById('cmp-panel').classList.remove('open');document.getElementById('cmp-overlay').classList.remove('open');}
+async function runCompare(){
+  const prompt=(document.getElementById('cmp-prompt').value||'').trim();
+  const pa=document.getElementById('cmp-select-a').value;
+  const pb=document.getElementById('cmp-select-b').value;
+  if(!prompt||!pa||!pb)return;
+  const btn=document.getElementById('cmp-run-btn');
+  const status=document.getElementById('cmp-status');
+  const outA=document.getElementById('cmp-out-a');
+  const outB=document.getElementById('cmp-out-b');
+  const metricsWrap=document.getElementById('cmp-metrics-wrap');
+  const metrics=document.getElementById('cmp-metrics');
+  const summary=document.getElementById('cmp-summary');
+  if(btn)btn.disabled=true;
+  if(outA)outA.textContent='';if(outB)outB.textContent='';
+  if(metricsWrap)metricsWrap.classList.remove('visible');
+  if(metrics)metrics.innerHTML='';if(summary)summary.textContent='';
+  document.getElementById('cmp-label-a').textContent=pa==='__current__'?'CURRENT SETTINGS':pa.toUpperCase();
+  document.getElementById('cmp-label-b').textContent=pb==='__current__'?'CURRENT SETTINGS':pb.toUpperCase();
+  try{
+    const resp=await fetch('/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset_a:pa,preset_b:pb,prompt})});
+    const reader=resp.body.getReader();const dec=new TextDecoder();let buf='';
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\\n');buf=lines.pop();
+      for(const line of lines){
+        if(!line.startsWith('data:'))continue;
+        try{
+          const d=JSON.parse(line.slice(5).trim());
+          if(d.phase==='a_start'&&status)status.textContent='running preset A…';
+          if(d.phase==='b_start'&&status)status.textContent='running preset B…';
+          if(d.phase==='scoring'&&status)status.textContent='scoring…';
+          if(d.phase==='a'&&d.text&&outA)outA.textContent+=d.text;
+          if(d.phase==='b'&&d.text&&outB)outB.textContent+=d.text;
+          if(d.phase==='scores'){
+            if(status)status.textContent='';
+            const s=d.scores;
+            const METRICS=['adherence','depth','clarity','efficiency','confidence','token_efficiency'];
+            if(metrics){
+              metrics.innerHTML=METRICS.filter(m=>s[m]).map(m=>{
+                const va=s[m].a,vb=s[m].b,w=s[m].winner;
+                return`<div class="cmp-metric-row"><span class="cmp-metric-name">${m.replace('_',' ')}</span><div class="cmp-bars"><div class="cmp-bar cmp-bar-a"><div class="cmp-bar-fill" style="width:${va}%"></div></div><div class="cmp-bar cmp-bar-b"><div class="cmp-bar-fill" style="width:${vb}%"></div></div></div><span class="cmp-winner">${w==='a'?'A':w==='b'?'B':'—'}</span></div>`;
+              }).join('');
+            }
+            if(s.summary&&summary)summary.textContent=s.summary;
+            if(metricsWrap)metricsWrap.classList.add('visible');
+          }
+          if(d.phase==='done'&&status)status.textContent='';
+          if(d.error&&status)status.textContent='✕ '+d.error;
+        }catch(_){}
+      }
+    }
+  }catch(e){if(status)status.textContent='✕ '+e.message;}
+  if(btn)btn.disabled=false;
+}
+loadPresets();
 (function(){if(localStorage.getItem('gain_theme')==='light')document.body.classList.add('light');})();
 function toggleTheme(){const l=document.body.classList.toggle('light');localStorage.setItem('gain_theme',l?'light':'dark');}
 </script>
@@ -1307,83 +1783,26 @@ body.light .ch-id{color:var(--text2);}
 body.light .fader-lbl{color:var(--chrome);}
 body.light .fader-val{color:var(--accent);text-shadow:none;}
 body.light .fader-track{
-  background:linear-gradient(90deg,
-    #606058 0%,
-    #7A7870 8%,
-    #989490 20%,
-    #A8A4A0 50%,
-    #989490 80%,
-    #7A7870 92%,
-    #606058 100%
-  );
-  border-color:#585850;
-  border-left-color:#686860;
-  border-right-color:#686860;
-  box-shadow:
-    inset 0 6px 14px rgba(0,0,0,.5),
-    inset 3px 0 8px rgba(0,0,0,.3),
-    inset -3px 0 8px rgba(0,0,0,.3),
-    inset 0 2px 0 rgba(0,0,0,.4),
-    0 0 0 1px rgba(0,0,0,.12);
+  background:rgba(200,196,188,.45);
+  border-color:rgba(0,120,115,.2);
+  overflow:hidden;
+  box-shadow:inset 0 2px 8px rgba(0,0,0,.08);
 }
 body.light .fader-fill{
-  background:linear-gradient(0deg,
-    rgba(0,100,100,.06) 0%,
-    rgba(0,130,125,.18) 35%,
-    rgba(0,155,148,.34) 65%,
-    rgba(0,175,168,.52) 85%,
-    rgba(0,185,178,.68) 100%
-  );
-  box-shadow:0 0 6px rgba(0,130,120,.22),inset 0 0 4px rgba(0,150,145,.10);
+  background:linear-gradient(0deg,rgba(0,118,112,.88) 0%,rgba(0,148,142,.68) 45%,rgba(0,172,165,.45) 80%,rgba(0,192,185,.22) 100%);
+  box-shadow:0 0 12px rgba(0,140,134,.25);
 }
 body.light .ch.t2 .fader-fill,body.light .ch.t4 .fader-fill{
-  background:linear-gradient(0deg,
-    rgba(90,30,160,.05) 0%,
-    rgba(100,40,180,.14) 35%,
-    rgba(115,60,200,.28) 65%,
-    rgba(130,80,220,.44) 85%,
-    rgba(140,95,235,.58) 100%
-  );
-  box-shadow:0 0 6px rgba(109,40,217,.20),inset 0 0 4px rgba(120,60,210,.08);
+  background:linear-gradient(0deg,rgba(98,38,188,.78) 0%,rgba(122,62,208,.58) 45%,rgba(146,94,224,.38) 80%,rgba(166,122,238,.18) 100%);
+  box-shadow:0 0 12px rgba(109,40,217,.18);
 }
-body.light .fader-thumb{
-  background:linear-gradient(180deg,
-    #FFFFFF 0%,
-    #F4F2EE 3%,
-    #DEDAD4 12%,
-    #B8B4AC 30%,
-    #989490 44%,
-    #888480 50%,
-    #989490 56%,
-    #B8B4AC 70%,
-    #DEDAD4 88%,
-    #F4F2EE 97%,
-    #FFFFFF 100%
-  );
-  border-color:#888480;
-  border-top-color:#FFFFFF;
-  border-bottom-color:#686460;
-  box-shadow:
-    0 4px 14px rgba(0,0,0,.38),
-    0 0 0 1px rgba(0,0,0,.14),
-    inset 0 3px 0 rgba(255,255,255,.85),
-    inset 0 -2px 0 rgba(0,0,0,.18);
+body.light .ch.t1 .fader-thumb,body.light .ch.t3 .fader-thumb{
+  background:linear-gradient(90deg,transparent,rgba(0,158,150,.8) 20%,rgba(0,196,188,1) 50%,rgba(0,158,150,.8) 80%,transparent);
+  box-shadow:0 0 6px rgba(0,148,140,.7);
 }
-body.light .fader-thumb::before,body.light .fader-thumb::after{
-  background:linear-gradient(90deg,transparent,rgba(0,0,0,.18) 25%,rgba(0,0,0,.18) 75%,transparent);
-}
-body.light .fader-thumb .thumb-center{
-  background:linear-gradient(90deg,transparent,rgba(0,140,135,.85) 12%,rgba(0,160,155,1) 50%,rgba(0,140,135,.85) 88%,transparent);
-  box-shadow:0 0 4px rgba(0,140,130,.6),0 0 10px rgba(0,130,120,.25);
-}
-body.light .fader-track.dragging .fader-thumb,
-body.light .fader-track.value-active .fader-thumb{
-  box-shadow:
-    0 2px 10px rgba(0,0,0,.35),
-    0 0 16px rgba(0,160,150,.45),
-    0 0 0 1px rgba(0,180,170,.28),
-    inset 0 2px 0 rgba(255,255,255,.8);
-  border-top-color:#FFFFFF;
+body.light .ch.t2 .fader-thumb,body.light .ch.t4 .fader-thumb{
+  background:linear-gradient(90deg,transparent,rgba(128,68,208,.8) 20%,rgba(152,100,228,1) 50%,rgba(128,68,208,.8) 80%,transparent);
+  box-shadow:0 0 6px rgba(109,40,217,.6);
 }
 body.light .knob{
   background:conic-gradient(#9A9890 0deg 225deg,#9A9890 225deg 360deg);
@@ -1637,33 +2056,24 @@ body.light .panel-hd{
 .console.compact .channel-bank{width:auto;flex:1;}
 .console.compact .channel-bank.right{border-left:1px solid var(--border);}
 
-/* Fader — remove height cap, let it dominate */
+/* Fader — tank takes all available space */
 .console.compact .fader-wrap{max-height:none;}
-.console.compact .fader-lbl{font-size:22px;letter-spacing:.08em;font-weight:900;}
-.console.compact .fader-val{font-size:18px;font-weight:900;}
-.console.compact .fader-track{width:36px;}
-.console.compact .fader-thumb{
-  width:120px;height:64px;
-  border-top-color:#FFFFFF;
-  box-shadow:
-    0 4px 20px rgba(0,0,0,.98),
-    0 0 28px rgba(0,196,232,.45),
-    0 0 56px rgba(0,196,232,.18),
-    0 0 0 2px rgba(0,220,255,.3),
-    inset 0 3px 0 rgba(255,255,255,.35);
-}
+.console.compact .fader-lbl{font-size:16px;letter-spacing:.1em;font-weight:900;}
+.console.compact .fader-val{font-size:16px;font-weight:900;}
+.console.compact .fader-track{width:calc(100% - 16px);overflow:hidden;}
+.console.compact .fader-thumb{width:100%;height:4px;left:0;transform:none;box-shadow:none;border:none;background:none;}
 
-/* Knob — larger, grouped with buttons, section border above */
-.console.compact .knob-wrap{padding:14px 0 12px;border-top:2px solid rgba(0,200,192,.18);}
-.console.compact .knob{width:80px;height:80px;}
-.console.compact .knob-body{inset:8px;}
-.console.compact .knob-dot{width:4px;height:19px;top:9px;transform-origin:50% 31px;}
-.console.compact .knob-lbl{font-size:17px;letter-spacing:.05em;font-weight:800;}
-.console.compact .knob-val{font-size:16px;font-weight:900;}
+/* Knob — compact, secondary to fader */
+.console.compact .knob-wrap{padding:4px 0 3px;border-top:1px solid rgba(0,200,192,.14);}
+.console.compact .knob{width:42px;height:42px;}
+.console.compact .knob-body{inset:5px;}
+.console.compact .knob-dot{width:3px;height:12px;top:5px;transform-origin:50% 16px;}
+.console.compact .knob-lbl{font-size:8px;letter-spacing:.08em;font-weight:800;}
+.console.compact .knob-val{font-size:9px;font-weight:900;}
 
-/* Buttons — kill the floating dead space, section border above */
-.console.compact .ch-btns{margin-top:0;gap:6px;padding-top:10px;border-top:2px solid rgba(0,200,192,.1);}
-.console.compact .ch-btn{height:40px;font-size:14px;letter-spacing:.1em;}
+/* Buttons */
+.console.compact .ch-btns{margin-top:4px;gap:4px;padding-top:4px;border-top:1px solid rgba(0,200,192,.1);}
+.console.compact .ch-btn{height:30px;font-size:10px;letter-spacing:.1em;}
 
 /* Track headers and misc */
 .console.compact .bank-hd{font-size:12px;padding:6px 16px;}
@@ -1735,14 +2145,15 @@ body.light .panel-hd{
 
 .ch-hdr-row{
   display:flex;align-items:center;justify-content:space-between;
-  width:calc(100% + 12px);margin-left:-6px;margin-top:-4px;margin-bottom:10px;
-  padding:5px 8px;flex-shrink:0;
-  background:rgba(0,30,50,.6);
-  border-bottom:1px solid rgba(0,160,180,.15);
+  width:calc(100% + 12px);margin-left:-6px;margin-top:-4px;margin-bottom:6px;
+  padding:3px 8px;flex-shrink:0;
+  background:rgba(0,20,36,.7);
+  border-bottom:1px solid rgba(0,160,180,.12);
 }
 .ch-id{
   font-size:9px;font-weight:900;letter-spacing:.16em;
-  color:#7A9AB8;text-transform:uppercase;
+  color:#C0D8EE;text-transform:uppercase;
+  text-shadow:0 0 8px rgba(0,180,200,.25);
 }
 .ch-pwr{
   width:18px;height:18px;border-radius:2px;
@@ -1837,10 +2248,10 @@ body.light .panel-hd{
 /* ── HARDWARE FADER ─────────────────────────────────────── */
 .fader-wrap{
   display:flex;flex-direction:column;align-items:center;
-  flex:1;min-height:80px;max-height:240px;
-  width:100%;gap:4px;
+  flex:1;min-height:100px;
+  width:100%;gap:3px;
 }
-.fader-lbl{font-size:8px;color:#7A9AB8;font-weight:700;letter-spacing:.1em;text-transform:uppercase;flex-shrink:0;}
+.fader-lbl{font-size:11px;color:#C8E0F0;font-weight:900;letter-spacing:.12em;text-transform:uppercase;flex-shrink:0;text-shadow:0 0 10px rgba(0,200,192,.35);}
 
 /* the rail assembly */
 .fader-rail{
@@ -1848,179 +2259,108 @@ body.light .panel-hd{
   width:100%;flex:1;min-height:60px;
   display:flex;justify-content:center;align-items:stretch;
 }
-/* tick marks column — labels removed, lines only */
-.fader-ticks{
-  position:absolute;right:calc(50% + 7px);top:0;bottom:0;
-  width:8px;display:flex;flex-direction:column;
-  justify-content:space-between;padding:0;
-  pointer-events:none;
-}
-.tick{
-  display:flex;align-items:center;justify-content:flex-end;
-  height:1px;
-}
-.tick-line{height:1px;background:var(--border2);flex-shrink:0;}
-.tick-line.major{background:var(--chrome);height:1px;}
+/* tick marks — hidden, tank is the visual */
+.fader-ticks{display:none;}
+.tick,.tick-line{display:none;}
 
-/* the groove/track — deep carved console slot */
+/* the tank — full-width liquid container */
 .fader-track{
-  width:10px;flex:1;
-  background:linear-gradient(180deg,#010204 0%,#020406 50%,#010204 100%);
-  border:1px solid #080F18;
-  border-left-color:#050C14;
-  border-right-color:#050C14;
-  border-radius:2px;
+  width:calc(100% - 8px);flex:1;
+  background:rgba(2,8,18,.92);
+  border:1px solid rgba(0,180,172,.22);
+  border-radius:5px;
   position:relative;
   cursor:ns-resize;
   touch-action:none;
-  box-shadow:
-    inset 0 8px 16px rgba(0,0,0,1),
-    inset 2px 0 6px rgba(0,0,0,.85),
-    inset -2px 0 6px rgba(0,0,0,.85),
-    inset 0 1px 0 rgba(255,255,255,.015),
-    0 0 0 1px rgba(0,196,232,.025);
+  overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(0,180,172,.06),inset 0 6px 24px rgba(0,0,0,.9),0 0 0 1px rgba(0,0,0,.6);
+}
+.ch.t2 .fader-track,.ch.t4 .fader-track{
+  border-color:rgba(139,92,246,.22);
+  box-shadow:inset 0 0 0 1px rgba(139,92,246,.06),inset 0 6px 24px rgba(0,0,0,.9),0 0 0 1px rgba(0,0,0,.6);
 }
 
-/* Level Halo — atmospheric glow pool, light from the thumb cascading down */
+/* Liquid fill — rises from bottom like fluid in a tank */
 .fader-fill{
   position:absolute;bottom:0;left:0;right:0;
-  border-radius:1px;
-  background:linear-gradient(0deg,
-    rgba(0,160,152,.06) 0%,
-    rgba(0,190,182,.15) 35%,
-    rgba(0,210,200,.30) 65%,
-    rgba(0,235,222,.50) 85%,
-    rgba(0,255,245,.64) 100%
-  );
+  border-radius:0;
   pointer-events:none;
+  background:linear-gradient(0deg,
+    rgba(0,148,140,.92) 0%,
+    rgba(0,182,175,.76) 35%,
+    rgba(0,212,204,.54) 70%,
+    rgba(0,235,228,.32) 90%,
+    rgba(100,255,250,.14) 100%
+  );
   box-shadow:
-    0 0 8px rgba(0,196,192,.28),
-    inset 0 0 5px rgba(0,220,210,.12),
-    0 0 18px rgba(0,180,175,.08);
-  transition:box-shadow .38s ease-out, background .38s ease-out;
+    0 0 22px rgba(0,200,192,.42),
+    0 0 55px rgba(0,180,175,.14),
+    inset 0 0 28px rgba(0,160,155,.08);
 }
-/* T2/T4 channels: glow purple instead of teal */
+/* T2/T4 channels: purple liquid */
 .ch.t2 .fader-fill,.ch.t4 .fader-fill{
   background:linear-gradient(0deg,
-    rgba(80,30,180,.06) 0%,
-    rgba(110,50,210,.15) 35%,
-    rgba(135,75,235,.30) 65%,
-    rgba(158,100,250,.50) 85%,
-    rgba(175,120,255,.64) 100%
+    rgba(88,28,180,.92) 0%,
+    rgba(118,60,220,.76) 35%,
+    rgba(148,96,240,.54) 70%,
+    rgba(175,132,.255,.32) 90%,
+    rgba(210,182,255,.14) 100%
   );
   box-shadow:
-    0 0 8px rgba(139,92,246,.26),
-    inset 0 0 5px rgba(160,110,255,.10),
-    0 0 18px rgba(139,92,246,.07);
+    0 0 22px rgba(139,92,246,.42),
+    0 0 55px rgba(139,92,246,.14),
+    inset 0 0 28px rgba(100,58,200,.08);
 }
+/* Active drag: boost fill brightness slightly */
 .fader-track.dragging .fader-fill,
 .fader-track.value-active .fader-fill{
-  background:linear-gradient(0deg,
-    rgba(0,160,152,.10) 0%,
-    rgba(0,195,185,.24) 30%,
-    rgba(0,218,205,.42) 60%,
-    rgba(0,242,228,.66) 82%,
-    rgba(0,255,248,.82) 100%
-  );
-  box-shadow:
-    0 0 14px rgba(0,196,192,.55),
-    inset 0 0 7px rgba(0,230,218,.22),
-    0 0 32px rgba(0,180,175,.18),
-    0 0 55px rgba(217,70,239,.07);
-  transition:box-shadow .04s ease-in, background .04s ease-in;
+  box-shadow:0 0 28px rgba(0,200,192,.6),0 0 60px rgba(0,180,175,.2),inset 0 0 30px rgba(0,160,155,.1);
 }
 .ch.t2 .fader-track.dragging .fader-fill,
 .ch.t2 .fader-track.value-active .fader-fill,
 .ch.t4 .fader-track.dragging .fader-fill,
 .ch.t4 .fader-track.value-active .fader-fill{
-  background:linear-gradient(0deg,
-    rgba(80,30,180,.10) 0%,
-    rgba(115,55,215,.24) 30%,
-    rgba(140,80,240,.42) 60%,
-    rgba(162,105,252,.66) 82%,
-    rgba(180,128,255,.82) 100%
-  );
-  box-shadow:
-    0 0 14px rgba(139,92,246,.55),
-    inset 0 0 7px rgba(165,115,255,.22),
-    0 0 32px rgba(139,92,246,.18),
-    0 0 55px rgba(217,70,239,.10);
-  transition:box-shadow .04s ease-in, background .04s ease-in;
-}
-.fader-track.dragging .fader-thumb,
-.fader-track.value-active .fader-thumb{
-  box-shadow:
-    0 2px 12px rgba(0,0,0,.98),
-    0 0 22px rgba(0,196,232,.65),
-    0 0 44px rgba(0,196,232,.22),
-    0 0 0 1px rgba(0,220,255,.28),
-    inset 0 2px 0 rgba(255,255,255,.35);
-  border-top-color:#F0F8FF;
-  transition:box-shadow .04s ease-in, border-top-color .04s ease-in;
+  box-shadow:0 0 28px rgba(139,92,246,.6),0 0 60px rgba(139,92,246,.2),inset 0 0 30px rgba(100,58,200,.1);
 }
 
-/* the hardware thumb cap — cold chrome console fader */
+/* liquid surface line — the thumb is now just a glowing horizon */
 .fader-thumb{
   position:absolute;
-  width:48px;height:42px;
-  left:50%;transform:translateX(-50%);
+  width:100%;height:4px;
+  left:0;transform:none;
   cursor:ns-resize;z-index:3;touch-action:none;
-  border-radius:4px;
-  background:linear-gradient(180deg,
-    #EEF6FF 0%,
-    #C8DCEE 4%,
-    #587890 16%,
-    #283E50 34%,
-    #0E1C28 47%,
-    #0A1620 50%,
-    #0E1C28 53%,
-    #283E50 66%,
-    #587890 84%,
-    #C8DCEE 96%,
-    #EEF6FF 100%
-  );
-  border:1px solid #060E18;
-  border-top-color:#D8EEFF;
-  border-bottom-color:#040C14;
-  box-shadow:
-    0 3px 12px rgba(0,0,0,.95),
-    0 0 0 1px rgba(0,196,232,.10),
-    inset 0 2px 0 rgba(255,255,255,.22),
-    0 0 10px rgba(0,200,192,.10);
+  border-radius:2px;
 }
-/* hairline grip serrations */
-.fader-thumb::before,.fader-thumb::after{
-  content:'';position:absolute;
-  left:14%;right:14%;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(0,0,0,.4) 25%,rgba(0,0,0,.4) 75%,transparent);
+/* t1/t3 = teal surface */
+.ch.t1 .fader-thumb,.ch.t3 .fader-thumb{
+  background:linear-gradient(90deg,transparent,rgba(0,228,220,.65) 18%,rgba(190,255,252,.92) 50%,rgba(0,228,220,.65) 82%,transparent);
+  box-shadow:0 0 10px rgba(0,220,212,1),0 0 22px rgba(0,200,192,.65);
 }
-.fader-thumb::before{top:calc(50% - 5px);}
-.fader-thumb::after {top:calc(50% + 5px);}
-/* teal center stripe — the level marker, reads as a position cursor */
-.fader-thumb .thumb-center{
-  position:absolute;left:10%;right:10%;top:50%;
-  height:2px;transform:translateY(-50%);
-  background:linear-gradient(90deg,transparent,rgba(0,215,255,.82) 12%,rgba(0,250,255,1) 50%,rgba(0,215,255,.82) 88%,transparent);
-  box-shadow:0 0 6px rgba(0,210,255,.82),0 0 16px rgba(0,200,255,.45),0 0 26px rgba(0,196,232,.20);
-  border-radius:1px;
+/* t2/t4 = purple surface */
+.ch.t2 .fader-thumb,.ch.t4 .fader-thumb{
+  background:linear-gradient(90deg,transparent,rgba(158,128,250,.65) 18%,rgba(224,198,255,.92) 50%,rgba(158,128,250,.65) 82%,transparent);
+  box-shadow:0 0 10px rgba(167,139,250,1),0 0 22px rgba(139,92,246,.65);
 }
+.fader-thumb::before,.fader-thumb::after{display:none;}
+.fader-thumb .thumb-center{display:none;}
 
 .fader-val{
-  font-size:8px;font-weight:700;color:var(--accent);
+  font-size:13px;font-weight:900;color:var(--accent);
   font-variant-numeric:tabular-nums;flex-shrink:0;
   text-shadow:0 0 8px rgba(0,200,192,.5);
+  letter-spacing:.05em;
 }
 
 /* ── HARDWARE KNOB ──────────────────────────────────────── */
 .knob-wrap{
   display:flex;flex-direction:column;align-items:center;
-  gap:4px;width:100%;flex-shrink:0;
-  padding:8px 0 6px;
+  gap:2px;width:100%;flex-shrink:0;
+  padding:4px 0 3px;
   border-top:1px solid var(--border);
 }
-.knob-lbl{font-size:8px;color:#7A9AB8;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
+.knob-lbl{font-size:7px;color:#7A9AB8;font-weight:700;letter-spacing:.1em;text-transform:uppercase;}
 .knob{
-  width:46px;height:46px;border-radius:50%;
+  width:36px;height:36px;border-radius:50%;
   position:relative;cursor:grab;touch-action:none;
   background:conic-gradient(#0A1620 0deg 225deg, #0A1620 225deg 360deg);
   box-shadow:
@@ -2041,7 +2381,7 @@ body.light .panel-hd{
 .knob.at-detent{animation:detent-flash .28s ease-out;}
 /* matte inner body — hardware console knob */
 .knob-body{
-  position:absolute;inset:5px;border-radius:50%;
+  position:absolute;inset:4px;border-radius:50%;
   background:radial-gradient(circle at 36% 30%,#2C3E54 0%,#16263A 28%,#0A1828 58%,#050E1A 100%);
   border:1px solid rgba(0,0,0,.98);
   box-shadow:
@@ -2055,11 +2395,11 @@ body.light .panel-hd{
 /* indicator pointer */
 .knob-dot{
   position:absolute;
-  width:3px;height:13px;
+  width:2px;height:10px;
   background:linear-gradient(180deg,#FFFFFF 0%,#A0F0FF 30%,#00C8E8 100%);
   border-radius:2px;
-  top:6px;left:50%;
-  transform-origin:50% 17px;
+  top:4px;left:50%;
+  transform-origin:50% 14px;
   transform:translateX(-50%) rotate(0deg);
   box-shadow:0 0 5px rgba(0,240,255,.85),0 0 12px rgba(0,196,232,.65),0 0 22px rgba(0,196,232,.3);
   transition:box-shadow .38s ease-out;
@@ -2080,20 +2420,18 @@ body.light .panel-hd{
   gap:3px;width:100%;flex-shrink:0;
   border-top:1px solid var(--border);
   padding-top:4px;
-  margin-top:auto;
+  margin-top:4px;
 }
 .ch-btn{
-  height:26px;border-radius:3px;
-  border:1px solid var(--border2);
-  border-top-color:#080E18;
-  background:linear-gradient(180deg,#04080E 0%,#060C14 100%);
-  color:var(--text2);
-  font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  height:28px;border-radius:3px;
+  border:1px solid rgba(55,100,140,.5);
+  background:rgba(10,20,34,.88);
+  color:#C0D8F0;
+  font-size:9px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
   cursor:pointer;transition:all .1s;
   display:flex;align-items:center;justify-content:center;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.7),inset 0 2px 6px rgba(0,0,0,.4),0 1px 0 rgba(255,255,255,.025);
 }
-.ch-btn:hover{background:var(--panel2);border-color:var(--accent);color:var(--accent2);text-shadow:0 0 8px rgba(0,200,255,.5);}
+.ch-btn:hover{background:rgba(14,28,48,.95);border-color:var(--accent);color:var(--accent2);text-shadow:0 0 8px rgba(0,200,255,.5);}
 .ch-btn.active{
   background:linear-gradient(180deg,#002830,#001820);
   color:#20F8EE;border-color:#00DDD4;
@@ -2935,7 +3273,7 @@ body.light .panel-hd{
 </div>
 
 <script>
-const THUMB_H = 42;
+const THUMB_H = 4;
 const FADERS = {
   intensity: {fill:'ff-intensity', thumb:'fth-intensity', val:'fv-intensity', track:'ft-intensity'},
   certainty: {fill:'ff-certainty', thumb:'fth-certainty', val:'fv-certainty', track:'ft-certainty'},
@@ -3778,6 +4116,16 @@ async function runCompare() {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({preset_a: presetA, preset_b: presetB, prompt})
     });
+    if (res.status === 401) {
+      setCompareStatus('Not logged in. Refresh and sign in again.'); runBtn.disabled = false; return;
+    }
+    if (res.status === 402) {
+      const d = await res.json();
+      const msg = d.plan === 'free'
+        ? `Free limit reached (${d.usage}/${d.limit} runs). Upgrade to keep comparing.`
+        : `Plan limit reached (${d.usage}/${d.limit} runs this month). Upgrade or wait for reset.`;
+      setCompareStatus(msg); runBtn.disabled = false; return;
+    }
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
     while (true) {
       const {done, value} = await reader.read(); if (done) break;
