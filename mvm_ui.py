@@ -683,7 +683,7 @@ LOGIN_HTML = """<!DOCTYPE html>
 <body>
   <div class="bg-grid"></div>
   <div class="card">
-    <div class="brand">gain</div>
+    <div class="brand">GAIN</div>
     <div class="tagline">The AI Behavioral Mixing Board</div>
     <div class="section-label">Continue with</div>
     <button class="btn-google" onclick="signInGoogle()">
@@ -804,7 +804,7 @@ body{
   position:relative;
 }
 .brand{
-  font-family:'Abril Fatface',serif;font-size:48px;letter-spacing:.06em;line-height:96px;
+  font-family:'Abril Fatface',serif;font-size:72px;letter-spacing:.06em;line-height:96px;
   background:linear-gradient(130deg,#00E8FF 0%,#A0C8FF 50%,#C0A0FF 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   filter:drop-shadow(0 0 6px rgba(0,200,255,.55)) drop-shadow(0 0 14px rgba(160,100,255,.3));
@@ -2005,7 +2005,7 @@ body.light .panel-hd{
 
 <!-- ── HEADER ─────────────────────────────────────────────────── -->
 <div class="hdr">
-  <span class="brand">gain</span>
+  <span class="brand">GAIN</span>
   <div class="hdr-center">
     <div class="hdr-settings-label">Current Settings</div>
     <div class="hdr-settings" id="hdr-settings">—</div>
