@@ -788,6 +788,34 @@ body{background:#060A0F;font-family:'Inter',sans-serif;height:100vh;display:flex
 .hdr-lbl{font-size:9px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#00DDD4;opacity:.9;}
 .hdr-vals{font-size:11px;color:#D8EAF8;letter-spacing:.04em;margin-top:2px;}
 .proto-tag{margin-left:auto;font-size:9px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:rgba(217,70,239,.7);border:1px solid rgba(217,70,239,.35);padding:5px 12px;border-radius:3px;}
+.theme-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(0,200,192,.45);background:rgba(0,200,192,.06);color:#00DDD4;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-left:10px;flex-shrink:0;}
+.theme-btn:hover{border-color:#00DDD4;background:rgba(0,200,192,.16);}
+/* ── Light theme ── */
+body.light{background:#EDEBE7;color:#1C2B3A;}
+body.light .hdr{background:#E8E5E0;border-bottom-color:rgba(0,0,0,.1);}
+body.light .brand{filter:drop-shadow(0 0 8px rgba(0,120,160,.35));}
+body.light .col{border-right-color:rgba(0,0,0,.08);background:#F5F3F0;}
+body.light .col-name{color:#5A7898;}
+body.light .hdr-lbl{color:#007E78;}
+body.light .hdr-vals{color:#0A2030;font-weight:800;}
+body.light .col-flbl{color:#007E78;text-shadow:0 0 1px rgba(0,220,200,1),0 0 4px rgba(0,210,190,.95),0 0 10px rgba(0,190,170,.7);-webkit-text-fill-color:unset;}
+body.light .t2 .col-flbl,body.light .t4 .col-flbl{color:#6D28D9;text-shadow:0 0 4px rgba(109,40,217,.4);}
+body.light .col-fval{color:#007E78;text-shadow:0 0 8px rgba(0,158,150,.5);}
+body.light .t2 .col-fval,body.light .t4 .col-fval{color:#6D28D9;text-shadow:0 0 4px rgba(109,40,217,.3);}
+body.light .f-track{background:linear-gradient(90deg,#606058 0%,#7A7870 8%,#989490 20%,#A8A4A0 50%,#989490 80%,#7A7870 92%,#606058 100%);border-color:#585850;box-shadow:inset 0 6px 14px rgba(0,0,0,.5),inset 3px 0 8px rgba(0,0,0,.3),inset -3px 0 8px rgba(0,0,0,.3),inset 0 2px 0 rgba(0,0,0,.4),0 0 0 1px rgba(0,0,0,.12);}
+body.light .t1 .f-fill,body.light .t3 .f-fill{background:linear-gradient(0deg,rgba(0,100,100,.06) 0%,rgba(0,130,125,.18) 35%,rgba(0,155,148,.34) 65%,rgba(0,175,168,.52) 85%,rgba(0,185,178,.68) 100%);box-shadow:0 0 6px rgba(0,130,120,.22);}
+body.light .t2 .f-fill,body.light .t4 .f-fill{background:linear-gradient(0deg,rgba(90,30,160,.05) 0%,rgba(100,40,180,.14) 35%,rgba(115,60,200,.28) 65%,rgba(130,80,220,.44) 85%,rgba(140,95,235,.58) 100%);box-shadow:0 0 6px rgba(109,40,217,.20);}
+body.light .f-thumb{background:linear-gradient(180deg,#FFFFFF 0%,#F4F2EE 3%,#DEDAD4 12%,#B8B4AC 30%,#989490 44%,#888480 50%,#989490 56%,#B8B4AC 70%,#DEDAD4 88%,#F4F2EE 97%,#FFFFFF 100%);border-color:#888480;border-top-color:#FFFFFF;border-bottom-color:#686460;box-shadow:0 4px 14px rgba(0,0,0,.38),0 0 0 1px rgba(0,0,0,.14),inset 0 3px 0 rgba(255,255,255,.85),inset 0 -2px 0 rgba(0,0,0,.18);}
+body.light .f-center{background:linear-gradient(90deg,transparent,rgba(0,140,135,.85) 12%,rgba(0,160,155,1) 50%,rgba(0,140,135,.85) 88%,transparent);box-shadow:0 0 4px rgba(0,140,130,.6),0 0 10px rgba(0,130,120,.25);}
+body.light .col-btn{color:rgba(200,235,245,.85);border-color:rgba(160,210,230,.35);background:rgba(100,180,200,.08);text-shadow:0 0 4px rgba(160,220,240,.3);}
+body.light .col-btn:hover{color:#fff;border-color:rgba(0,220,212,.6);background:rgba(0,180,170,.15);text-shadow:0 0 8px rgba(0,220,212,.6);}
+body.light .col-btn.active{background:rgba(0,126,120,.14);border-color:#007E78;color:#001A14;text-shadow:0 0 1px rgba(0,240,220,1),0 0 5px rgba(0,210,190,.9),0 0 14px rgba(0,190,170,.55);}
+body.light .col-btn.mute-btn{color:rgba(255,160,160,.8);border-color:rgba(200,60,60,.35);background:rgba(180,30,30,.06);}
+body.light .col-btn.mute-btn.active{color:#FF4444;border-color:rgba(220,40,40,.7);background:rgba(160,20,20,.18);text-shadow:0 0 6px rgba(255,60,60,.9);}
+body.light .t1 .col-accent,body.light .t3 .col-accent{background:linear-gradient(90deg,#005850,#007E78);box-shadow:none;}
+body.light .t2 .col-accent,body.light .t4 .col-accent{background:linear-gradient(90deg,#5020A0,#6D28D9);box-shadow:none;}
+body.light .proto-tag{color:#B020C8;border-color:rgba(176,32,200,.35);}
+body.light .theme-btn{border-color:rgba(0,126,120,.45);color:#007E78;background:rgba(0,126,120,.06);}
 .stage{flex:1;display:flex;min-height:0;}
 .col{flex:1;display:flex;flex-direction:column;border-right:1px solid #162030;padding:16px 14px 12px;min-width:0;position:relative;}
 .col:last-child{border-right:none;}
@@ -824,6 +852,7 @@ body{background:#060A0F;font-family:'Inter',sans-serif;height:100vh;display:flex
     <div class="hdr-lbl">Current Settings</div>
     <div class="hdr-vals" id="hdr-vals">—</div>
   </div>
+  <button class="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
   <div class="proto-tag">PROTOTYPE</div>
 </div>
 <div class="stage">
@@ -979,6 +1008,8 @@ Object.entries(FADERS).forEach(([field,ids])=>{
   thumbEl.addEventListener('pointerdown',onDown);
   [trackEl,thumbEl].forEach(el=>el.addEventListener('dblclick',()=>{setFader(field,0.5);set(field,0.5);}));
 });
+(function(){if(localStorage.getItem('gain_theme')==='light')document.body.classList.add('light');})();
+function toggleTheme(){const l=document.body.classList.toggle('light');localStorage.setItem('gain_theme',l?'light':'dark');}
 </script>
 </body>
 </html>"""
