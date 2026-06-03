@@ -132,7 +132,7 @@ def _execute_tool(name: str, inputs: dict) -> str:
 # ── State ─────────────────────────────────────────────────────────────────────
 
 DEFAULT_STATE = {
-    "mode": "BUILD", "intensity": 0.5, "depth": 0.5,
+    "mode": "", "intensity": 0.5, "depth": 0.5,
     "certainty": 0.5, "risk": 0.5, "stance": "",
     "scope": 0.5, "bandwidth": 0.5, "filter": "",
     "room": 0.5, "decay": 0.5, "voice": "",
@@ -3742,6 +3742,9 @@ function launchFireworks() {
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
+# Always open clean — reset to neutral state on every server start
+write_state(DEFAULT_STATE.copy())
 
 if __name__ == "__main__":
     print(f"┌──────────────────────────────────────────────┐")
