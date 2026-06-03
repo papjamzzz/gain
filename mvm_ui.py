@@ -2537,10 +2537,10 @@ const BADGE_C  = {EXPLORE:'#00A8A0', FIX:'#8B5CF6', BUILD:'#00C8C0'};
 const PILL_C   = ['#00C8C0','#8B5CF6','#00A0A8','#6040C8'];
 
 let isDragging  = false;
-// Safety net: if a pointer is released anywhere (including outside the element),
-// reset isDragging so SSE updates are never permanently blocked.
-document.addEventListener('pointerup',     () => { isDragging = false; }, true);
-document.addEventListener('pointercancel', () => { isDragging = false; }, true);
+const draggingFaders = new Set();
+const draggingKnobs  = new Set();
+document.addEventListener('pointerup',     () => { isDragging = false; draggingFaders.clear(); draggingKnobs.clear(); }, true);
+document.addEventListener('pointercancel', () => { isDragging = false; draggingFaders.clear(); draggingKnobs.clear(); }, true);
 const activeTimers = {};
 const prevVals  = {};  // tracks last seen value per field to detect real changes
 
@@ -2720,11 +2720,15 @@ function setPill(id, text, color) {
 function applyState(s) {
   lastState = s;
   Object.keys(FADERS).forEach(f => {
+    if (draggingFaders.has(f)) return;
     const v = s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5);
-    if (checkPickup(f, v)) return; // blocked — physical hasn't reached software position yet
+    if (checkPickup(f, v)) return;
     setFader(f, v);
   });
-  Object.keys(KNOBS).forEach(f  => setKnob(f,  s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5)));
+  Object.keys(KNOBS).forEach(f => {
+    if (draggingKnobs.has(f)) return;
+    setKnob(f, s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5));
+  });
   METERS.forEach(f => setMeter(f, s[f] ?? (FIELD_DEFAULTS[f] ?? 0.5)));
   setButtons('mode',   s.mode);
   setButtons('stance', s.stance);
@@ -2818,52 +2822,36 @@ const FINE_MULT     = 0.25;  // Shift key precision multiplier
 const KNOB_SENS     = 0.90;  // knob travel sensitivity
 const KNOB_DETENT   = 0.022; // center snap zone (±2.2% around 0.5)
 
-/* fader physics drag */
+/* fader drag — direct, no physics */
 Object.entries(FADERS).forEach(([field, ids]) => {
   const trackEl = document.getElementById(ids.track);
   const thumbEl = document.getElementById(ids.thumb);
   if (!trackEl || !thumbEl) return;
   const getV = () => parseFloat(document.getElementById(ids.val).textContent);
-  let vel = 0, rafId = null;
-
-  function coast() {
-    vel *= FADER_DAMPING;
-    const cur = getV(), next = Math.max(0, Math.min(1, cur + vel));
-    if (Math.abs(vel) < 0.0003 || next === cur) { set(field, Math.round(next*1000)/1000); return; }
-    setFader(field, next);
-    rafId = requestAnimationFrame(coast);
-  }
 
   function onDown(e) {
     const cap = e.currentTarget;
     e.preventDefault(); e.stopPropagation();
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     try { cap.setPointerCapture(e.pointerId); } catch(_) {}
     isDragging = true;
+    draggingFaders.add(field);
     trackEl.classList.add('dragging');
-    let prevY = e.clientY, prevT = performance.now();
-    vel = 0;
+    const r = Math.max(20, trackEl.offsetHeight - THUMB_H);
+    let prevY = e.clientY;
     function onMove(ev) {
-      const now = performance.now(), dt = Math.max(8, now - prevT);
-      const dy  = ev.clientY - prevY;
-      const r   = getRange(ids.track);
+      const dy   = ev.clientY - prevY;
       const fine = ev.shiftKey ? FINE_MULT : 1;
-      const raw  = -dy / r * fine;
-      // Exponential ease-out: precise when slow, accelerates when fast
-      const sign   = raw < 0 ? -1 : 1;
-      const curved = sign * Math.pow(Math.abs(raw), 0.78);
-      vel = vel * FADER_INERTIA + (-dy / r * fine) * (16 / dt) * (1 - FADER_INERTIA);
-      setFader(field, Math.max(0, Math.min(1, getV() + curved)));
-      prevY = ev.clientY; prevT = now;
+      setFader(field, Math.max(0, Math.min(1, getV() + (-dy / r * fine))));
+      prevY = ev.clientY;
     }
     function onUp() {
       isDragging = false;
+      draggingFaders.delete(field);
       trackEl.classList.remove('dragging');
       cap.removeEventListener('pointermove', onMove);
       cap.removeEventListener('pointerup',   onUp);
       cap.removeEventListener('pointercancel', onUp);
-      if (Math.abs(vel) > 0.005) rafId = requestAnimationFrame(coast);
-      else set(field, Math.round(getV()*1000)/1000);
+      set(field, Math.round(getV()*1000)/1000);
     }
     cap.addEventListener('pointermove', onMove);
     cap.addEventListener('pointerup',   onUp);
@@ -2871,8 +2859,6 @@ Object.entries(FADERS).forEach(([field, ids]) => {
   }
 
   const reset = () => {
-    if (rafId) cancelAnimationFrame(rafId);
-    vel = 0;
     const d = FIELD_DEFAULTS[field]??0.5;
     setFader(field, d); set(field, d);
   };
@@ -2882,53 +2868,40 @@ Object.entries(FADERS).forEach(([field, ids]) => {
   thumbEl.addEventListener('dblclick', reset);
 });
 
-/* knob physics drag */
+/* knob drag — direct, no physics */
 Object.entries(KNOBS).forEach(([field, ids]) => {
   const knobEl = document.getElementById('knob-'+field);
   if (!knobEl) return;
   const getV = () => parseFloat(document.getElementById(ids.val).textContent);
-  let vel = 0, rafId = null;
-
-  function coast() {
-    vel *= KNOB_DAMPING;
-    const cur = getV(), next = Math.max(0, Math.min(1, cur + vel));
-    if (Math.abs(vel) < 0.0002 || next === cur) { set(field, Math.round(next*1000)/1000); return; }
-    setKnob(field, next);
-    rafId = requestAnimationFrame(coast);
-  }
 
   function onDown(e) {
     e.preventDefault(); e.stopPropagation();
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
     try { knobEl.setPointerCapture(e.pointerId); } catch(_) {}
     isDragging = true;
-    let prevY = e.clientY, prevT = performance.now();
-    vel = 0;
+    draggingKnobs.add(field);
+    let prevY = e.clientY;
     function onMove(ev) {
-      const now  = performance.now(), dt = Math.max(8, now - prevT);
-      const dy   = ev.clientY - prevY;
-      const fine = ev.shiftKey ? FINE_MULT * 0.8 : 1;
+      const dy    = ev.clientY - prevY;
+      const fine  = ev.shiftKey ? FINE_MULT * 0.8 : 1;
       const delta = (-dy / 120) * KNOB_SENS * fine;
-      vel = vel * KNOB_INERTIA + delta * (16 / dt) * (1 - KNOB_INERTIA);
       let nv = Math.max(0, Math.min(1, getV() + delta));
-      // Center detent: visual snap to 0.5 (hold Shift to bypass)
       if (!ev.shiftKey && Math.abs(nv - 0.5) < KNOB_DETENT) {
-        nv = 0.5; vel = 0;
+        nv = 0.5;
         knobEl.classList.remove('at-detent');
-        void knobEl.offsetWidth; // force reflow so re-adding retriggers animation
+        void knobEl.offsetWidth;
         knobEl.classList.add('at-detent');
         setTimeout(() => knobEl.classList.remove('at-detent'), 300);
       }
       setKnob(field, nv);
-      prevY = ev.clientY; prevT = now;
+      prevY = ev.clientY;
     }
     function onUp() {
       isDragging = false;
+      draggingKnobs.delete(field);
       knobEl.removeEventListener('pointermove', onMove);
       knobEl.removeEventListener('pointerup',   onUp);
       knobEl.removeEventListener('pointercancel', onUp);
-      if (Math.abs(vel) > 0.002) rafId = requestAnimationFrame(coast);
-      else set(field, Math.round(getV()*1000)/1000);
+      set(field, Math.round(getV()*1000)/1000);
     }
     knobEl.addEventListener('pointermove', onMove);
     knobEl.addEventListener('pointerup',   onUp);
@@ -2936,8 +2909,6 @@ Object.entries(KNOBS).forEach(([field, ids]) => {
   }
 
   const reset = () => {
-    if (rafId) cancelAnimationFrame(rafId);
-    vel = 0;
     const d = FIELD_DEFAULTS[field]??0.5;
     setKnob(field, d); set(field, d);
   };
