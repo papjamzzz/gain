@@ -816,6 +816,21 @@ body.light .t1 .col-accent,body.light .t3 .col-accent{background:linear-gradient
 body.light .t2 .col-accent,body.light .t4 .col-accent{background:linear-gradient(90deg,#5020A0,#6D28D9);box-shadow:none;}
 body.light .proto-tag{color:#B020C8;border-color:rgba(176,32,200,.35);}
 body.light .theme-btn{border-color:rgba(0,126,120,.45);color:#007E78;background:rgba(0,126,120,.06);}
+.col-knob-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 0 10px;border-top:1px solid rgba(0,200,192,.14);flex-shrink:0;}
+.col-klbl{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#6A8AA8;text-align:center;}
+.col-knob{width:58px;height:58px;border-radius:50%;position:relative;cursor:grab;touch-action:none;background:conic-gradient(#0A1620 0deg 225deg,#0A1620 225deg 360deg);box-shadow:0 5px 18px rgba(0,0,0,1),0 0 0 1px rgba(0,0,0,.98),0 0 0 2px rgba(255,255,255,.04),inset 0 1px 0 rgba(255,255,255,.06),0 0 20px rgba(0,196,232,.08);}
+.col-knob:active{cursor:grabbing;}
+.col-knob .knob-body{position:absolute;inset:5px;border-radius:50%;background:radial-gradient(circle at 36% 30%,#2C3E54 0%,#16263A 28%,#0A1828 58%,#050E1A 100%);border:1px solid rgba(0,0,0,.98);box-shadow:inset 0 3px 7px rgba(255,255,255,.13),inset 0 -3px 9px rgba(0,0,0,.96);}
+.col-knob .knob-dot{position:absolute;width:3px;height:14px;background:linear-gradient(180deg,#FFFFFF,#A0F0FF,#00C8E8);border-radius:2px;top:7px;left:50%;transform-origin:50% 22px;transform:translateX(-50%) rotate(0deg);box-shadow:0 0 5px rgba(0,240,255,.85),0 0 12px rgba(0,196,232,.65);}
+.col-kval{font-size:13px;font-weight:900;color:#00DDD4;font-variant-numeric:tabular-nums;text-shadow:0 0 6px rgba(0,200,192,.4);}
+.t2 .col-kval,.t4 .col-kval{color:#A78BFA;text-shadow:0 0 6px rgba(167,139,250,.4);}
+body.light .col-knob{background:conic-gradient(#9A9890 0deg 225deg,#9A9890 225deg 360deg);box-shadow:0 4px 12px rgba(0,0,0,.30),0 0 0 1px rgba(0,0,0,.20),0 0 0 2px rgba(255,255,255,.6);}
+body.light .col-knob .knob-body{background:radial-gradient(circle at 32% 28%,#F0EDE8 0%,#D8D4CE 22%,#B8B4AC 50%,#A0A098 78%,#909088 100%);border-color:rgba(0,0,0,.25);}
+body.light .col-knob .knob-dot{background:linear-gradient(180deg,#FFFFFF,#A0D0C8,#007E78);box-shadow:0 0 4px rgba(0,140,130,.6);}
+body.light .col-kval{color:#007E78;text-shadow:none;}
+body.light .t2 .col-kval,body.light .t4 .col-kval{color:#6D28D9;}
+body.light .col-klbl{color:#5A7898;}
+body.light .col-knob-wrap{border-top-color:rgba(0,126,120,.15);}
 .stage{flex:1;display:flex;min-height:0;}
 .col{flex:1;display:flex;flex-direction:column;border-right:1px solid #162030;padding:16px 14px 12px;min-width:0;position:relative;}
 .col:last-child{border-right:none;}
@@ -867,6 +882,11 @@ body.light .theme-btn{border-color:rgba(0,126,120,.45);color:#007E78;background:
       </div>
     </div>
     <div class="col-fval" id="fv-intensity">0.50</div>
+    <div class="col-knob-wrap">
+      <div class="col-klbl">THINKING TIME</div>
+      <div class="col-knob" id="knob-depth"><div class="knob-body"></div><div class="knob-dot" id="kd-depth"></div></div>
+      <div class="col-kval" id="kv-depth">0.50</div>
+    </div>
     <div class="col-btns">
       <button class="col-btn" data-field="mode" data-val="EXPLORE" onclick="toggleBtn('mode','EXPLORE')">EXPLORE</button>
       <button class="col-btn mute-btn" id="mbtn-t1" onclick="toggleTrack('t1')">MUTE</button>
@@ -884,6 +904,11 @@ body.light .theme-btn{border-color:rgba(0,126,120,.45);color:#007E78;background:
       </div>
     </div>
     <div class="col-fval" id="fv-certainty">0.50</div>
+    <div class="col-knob-wrap">
+      <div class="col-klbl">BOLDNESS</div>
+      <div class="col-knob" id="knob-risk"><div class="knob-body"></div><div class="knob-dot" id="kd-risk"></div></div>
+      <div class="col-kval" id="kv-risk">0.50</div>
+    </div>
     <div class="col-btns">
       <button class="col-btn" data-field="stance" data-val="LIST" onclick="toggleBtn('stance','LIST')">LIST</button>
       <button class="col-btn mute-btn" id="mbtn-t2" onclick="toggleTrack('t2')">MUTE</button>
@@ -901,6 +926,11 @@ body.light .theme-btn{border-color:rgba(0,126,120,.45);color:#007E78;background:
       </div>
     </div>
     <div class="col-fval" id="fv-scope">0.50</div>
+    <div class="col-knob-wrap">
+      <div class="col-klbl">CONTEXT SIZE</div>
+      <div class="col-knob" id="knob-bandwidth"><div class="knob-body"></div><div class="knob-dot" id="kd-bandwidth"></div></div>
+      <div class="col-kval" id="kv-bandwidth">0.50</div>
+    </div>
     <div class="col-btns">
       <button class="col-btn" data-field="filter" data-val="FILE" onclick="toggleBtn('filter','FILE')">FILE</button>
       <button class="col-btn mute-btn" id="mbtn-t3" onclick="toggleTrack('t3')">MUTE</button>
@@ -918,6 +948,11 @@ body.light .theme-btn{border-color:rgba(0,126,120,.45);color:#007E78;background:
       </div>
     </div>
     <div class="col-fval" id="fv-room">0.50</div>
+    <div class="col-knob-wrap">
+      <div class="col-klbl">MEMORY</div>
+      <div class="col-knob" id="knob-decay"><div class="knob-body"></div><div class="knob-dot" id="kd-decay"></div></div>
+      <div class="col-kval" id="kv-decay">0.50</div>
+    </div>
     <div class="col-btns">
       <button class="col-btn" data-field="voice" data-val="DIRECT" onclick="toggleBtn('voice','DIRECT')">DIRECT</button>
       <button class="col-btn mute-btn" id="mbtn-t4" onclick="toggleTrack('t4')">MUTE</button>
@@ -926,12 +961,18 @@ body.light .theme-btn{border-color:rgba(0,126,120,.45);color:#007E78;background:
   </div>
 </div>
 <script>
-const THUMB_H=60,FINE_MULT=0.25;
+const THUMB_H=60,FINE_MULT=0.25,KNOB_SENS=0.90,KNOB_DETENT=0.022;
 const FADERS={
   intensity:{fill:'ff-intensity',thumb:'fth-intensity',val:'fv-intensity',track:'ft-intensity'},
   certainty:{fill:'ff-certainty',thumb:'fth-certainty',val:'fv-certainty',track:'ft-certainty'},
   scope:    {fill:'ff-scope',    thumb:'fth-scope',    val:'fv-scope',    track:'ft-scope'},
   room:     {fill:'ff-room',     thumb:'fth-room',     val:'fv-room',     track:'ft-room'},
+};
+const KNOBS={
+  depth:    {dot:'kd-depth',    val:'kv-depth'},
+  risk:     {dot:'kd-risk',     val:'kv-risk'},
+  bandwidth:{dot:'kd-bandwidth',val:'kv-bandwidth'},
+  decay:    {dot:'kd-decay',    val:'kv-decay'},
 };
 let lastState={};
 const dragging=new Set();
@@ -943,9 +984,27 @@ function setFader(field,v){
   document.getElementById(f.thumb).style.bottom=(v*r)+'px';
   document.getElementById(f.val).textContent=v.toFixed(2);
 }
+function setKnob(field,v){
+  const k=KNOBS[field];if(!k)return;
+  const dot=document.getElementById(k.dot);
+  if(dot)dot.style.transform='translateX(-50%) rotate('+((-135+v*270))+'deg)';
+  const val=document.getElementById(k.val);
+  if(val)val.textContent=v.toFixed(2);
+  const el=document.getElementById('knob-'+field);
+  if(el){
+    const s=225,e=s+v*270;
+    const light=document.body.classList.contains('light');
+    const dark=light?'#9A9890':'#0A1620';
+    const lit=light?'#007E78':'#00DDD4';
+    el.style.background=e<=360
+      ?'conic-gradient('+dark+' 0deg '+s+'deg,'+lit+' '+s+'deg '+e+'deg,'+dark+' '+e+'deg 360deg)'
+      :'conic-gradient('+lit+' 0deg '+(e-360)+'deg,'+dark+' '+(e-360)+'deg '+s+'deg,'+lit+' '+s+'deg 360deg)';
+  }
+}
 function applyState(s){
   lastState=s;
   Object.keys(FADERS).forEach(f=>{if(!dragging.has(f))setFader(f,s[f]??0.5);});
+  Object.keys(KNOBS).forEach(f=>{if(!dragging.has(f))setKnob(f,s[f]??0.5);});
   document.querySelectorAll('.col-btn[data-field]').forEach(b=>
     b.classList.toggle('active',b.dataset.val===s[b.dataset.field]));
   ['t1','t2','t3','t4'].forEach(t=>{
@@ -1007,6 +1066,37 @@ Object.entries(FADERS).forEach(([field,ids])=>{
   trackEl.addEventListener('pointerdown',onDown);
   thumbEl.addEventListener('pointerdown',onDown);
   [trackEl,thumbEl].forEach(el=>el.addEventListener('dblclick',()=>{setFader(field,0.5);set(field,0.5);}));
+});
+Object.entries(KNOBS).forEach(([field,ids])=>{
+  const knobEl=document.getElementById('knob-'+field);
+  if(!knobEl)return;
+  const getV=()=>parseFloat(document.getElementById(ids.val).textContent);
+  function onDown(e){
+    e.preventDefault();e.stopPropagation();
+    try{knobEl.setPointerCapture(e.pointerId);}catch(_){}
+    dragging.add(field);
+    let prevY=e.clientY;
+    function onMove(ev){
+      const dy=ev.clientY-prevY;
+      const fine=ev.shiftKey?FINE_MULT*0.8:1;
+      let nv=Math.max(0,Math.min(1,getV()+(-dy/120)*KNOB_SENS*fine));
+      if(!ev.shiftKey&&Math.abs(nv-0.5)<KNOB_DETENT)nv=0.5;
+      setKnob(field,nv);
+      prevY=ev.clientY;
+    }
+    function onUp(){
+      dragging.delete(field);
+      knobEl.removeEventListener('pointermove',onMove);
+      knobEl.removeEventListener('pointerup',onUp);
+      knobEl.removeEventListener('pointercancel',onUp);
+      set(field,Math.round(getV()*1000)/1000);
+    }
+    knobEl.addEventListener('pointermove',onMove);
+    knobEl.addEventListener('pointerup',onUp);
+    knobEl.addEventListener('pointercancel',onUp);
+  }
+  knobEl.addEventListener('pointerdown',onDown);
+  knobEl.addEventListener('dblclick',()=>{setKnob(field,0.5);set(field,0.5);});
 });
 (function(){if(localStorage.getItem('gain_theme')==='light')document.body.classList.add('light');})();
 function toggleTheme(){const l=document.body.classList.toggle('light');localStorage.setItem('gain_theme',l?'light':'dark');}
