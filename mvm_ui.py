@@ -3497,7 +3497,7 @@ function renderCompareScores(scores, nameA, nameB) {
           '<div><div class="cmp-raw-num-a">' + (cmpWordsA||'—') + '</div><div class="cmp-raw-sub">' + esc(nameA) + ' words</div></div>' +
           '<div><div class="cmp-raw-num-b">' + (cmpWordsB||'—') + '</div><div class="cmp-raw-sub">' + esc(nameB) + ' words</div></div>' +
         '</div>' +
-        (wRatio ? '<div class="cmp-raw-note">' + wLonger + ' is ' + wRatio.toFixed(1) + '× longer</div>' : '') +
+        (wRatio >= 1.15 ? '<div class="cmp-raw-note">' + wLonger + ' is ' + wRatio.toFixed(1) + '× longer</div>' : wRatio ? '<div class="cmp-raw-note">Nearly identical length</div>' : '') +
       '</div>' +
       '<div class="cmp-raw-card">' +
         '<div class="cmp-raw-lbl">Tokens Used</div>' +
@@ -3505,7 +3505,7 @@ function renderCompareScores(scores, nameA, nameB) {
           '<div><div class="cmp-raw-num-a">' + (cmpTokensA||'—') + '</div><div class="cmp-raw-sub">' + esc(nameA) + '</div></div>' +
           '<div><div class="cmp-raw-num-b">' + (cmpTokensB||'—') + '</div><div class="cmp-raw-sub">' + esc(nameB) + '</div></div>' +
         '</div>' +
-        (tDiff ? '<div class="cmp-raw-note">' + tCheaper + ' used ' + tDiff.toLocaleString() + ' fewer tokens</div>' : '') +
+        (tDiff > 20 ? '<div class="cmp-raw-note">' + tCheaper + ' used ' + tDiff.toLocaleString() + ' fewer tokens</div>' : tDiff >= 0 ? '<div class="cmp-raw-note">Token cost virtually identical</div>' : '') +
       '</div>';
   }
 
