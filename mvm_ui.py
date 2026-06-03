@@ -1839,10 +1839,12 @@ body.light .panel-hd{
 .presets-wrap{padding:6px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .presets-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
 .preset-save-row{display:flex;gap:5px;align-items:center;}
-.preset-input{height:22px;background:#030507;border:1px solid var(--border2);border-radius:2px;color:var(--text);font-size:10px;padding:0 7px;font-family:inherit;width:130px;}
-.preset-input:focus{outline:none;border-color:var(--accent);}
-.preset-save-btn{height:22px;padding:0 10px;border-radius:2px;border:1px solid var(--accent);background:rgba(0,200,192,.07);color:var(--accent);font-size:9px;font-weight:800;letter-spacing:.08em;cursor:pointer;transition:all .1s;flex-shrink:0;}
-.preset-save-btn:hover{background:rgba(0,200,192,.18);}
+.preset-save-center{display:flex;gap:8px;align-items:center;justify-content:center;padding:10px 14px 8px;}
+.preset-input{height:44px;background:#040608;border:2px solid rgba(0,220,212,.35);border-radius:4px;color:#FFFFFF;font-size:15px;font-weight:600;padding:0 14px;font-family:'Inter',sans-serif;flex:1;outline:none;transition:border-color .15s;}
+.preset-input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,200,192,.1);}
+.preset-input::placeholder{color:rgba(0,220,212,.4);}
+.preset-save-btn{height:44px;padding:0 20px;border-radius:4px;border:2px solid var(--accent);background:rgba(0,200,192,.12);color:var(--accent2);font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;transition:all .12s;flex-shrink:0;text-shadow:0 0 8px rgba(0,220,212,.5);box-shadow:0 0 12px rgba(0,200,192,.2);}
+.preset-save-btn:hover{background:rgba(0,200,192,.24);box-shadow:0 0 20px rgba(0,200,192,.4);}
 .abort-btn{display:block;margin-top:4px;padding:2px 7px;height:16px;border-radius:2px;border:1px solid rgba(255,59,59,.4);background:transparent;color:rgba(255,80,80,.6);font-size:7px;font-weight:800;letter-spacing:.1em;cursor:pointer;transition:all .1s;text-transform:uppercase;line-height:1;}
 .abort-btn:hover{border-color:#FF3B3B;color:#FF3B3B;background:rgba(255,59,59,.08);}
 .abort-btn.firing{border-color:#FF6060;color:#FF6060;background:rgba(255,59,59,.2);}
@@ -1929,14 +1931,19 @@ body.light .panel-hd{
 }
 
 /* ── COMPARE PANEL ──────────────────────────────────────── */
-.cmp-open-btn{
-  height:36px;padding:0 14px;border-radius:4px;
-  border:1.5px solid rgba(217,70,239,.5);background:rgba(217,70,239,.08);
-  color:var(--magenta2);font-size:10px;font-weight:800;letter-spacing:.12em;
-  text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap;
-  box-shadow:0 0 10px rgba(217,70,239,.18);text-shadow:0 0 8px rgba(240,171,255,.45);flex-shrink:0;
+@keyframes cmp-pulse{
+  0%,100%{box-shadow:0 0 12px rgba(217,70,239,.35),0 0 24px rgba(217,70,239,.12);}
+  50%{box-shadow:0 0 22px rgba(217,70,239,.7),0 0 44px rgba(217,70,239,.28),0 0 64px rgba(217,70,239,.1);}
 }
-.cmp-open-btn:hover{background:rgba(217,70,239,.18);border-color:var(--magenta2);box-shadow:0 0 18px rgba(217,70,239,.35);}
+.cmp-open-btn{
+  height:44px;padding:0 22px;border-radius:4px;
+  border:2px solid rgba(217,70,239,.8);background:rgba(217,70,239,.14);
+  color:var(--magenta2);font-size:11px;font-weight:900;letter-spacing:.16em;
+  text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;
+  text-shadow:0 0 10px rgba(240,171,255,.7);flex-shrink:0;
+  animation:cmp-pulse 2.4s ease-in-out infinite;
+}
+.cmp-open-btn:hover{background:rgba(217,70,239,.28);border-color:var(--magenta2);animation:none;box-shadow:0 0 28px rgba(217,70,239,.6),0 0 56px rgba(217,70,239,.2);}
 .cmp-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;}
 .cmp-overlay.open{display:block;}
 .cmp-panel{
@@ -1990,7 +1997,7 @@ body.light .panel-hd{
 .cmp-bar-score{font-size:8px;font-weight:700;font-variant-numeric:tabular-nums;width:22px;text-align:right;flex-shrink:0;}
 .cmp-bar-score-a{color:var(--accent);}
 .cmp-bar-score-b{color:var(--magenta2);}
-.cmp-summary{font-size:11px;line-height:1.7;color:var(--text2);background:#040608;border:1px solid var(--border);border-radius:3px;padding:10px 12px;font-style:italic;}
+.cmp-summary{font-size:14px;line-height:1.8;color:#FFFFFF;font-weight:500;background:#040608;border:1px solid rgba(217,70,239,.25);border-radius:3px;padding:14px 16px;}
 .cmp-no-presets{font-size:12px;color:var(--text3);text-align:center;padding:28px 0;font-style:italic;}
 </style>
 </head>
@@ -2183,12 +2190,12 @@ body.light .panel-hd{
 
     <!-- PRESETS -->
     <div class="presets-wrap">
+      <div class="preset-save-center">
+        <input class="preset-input" id="preset-input" type="text" placeholder="name this state and save it…" maxlength="40">
+        <button class="preset-save-btn" onclick="savePreset('preset-input')">SAVE PRESET</button>
+      </div>
       <div class="presets-hd-row">
-        <div class="section-hd">PRESETS</div>
-        <div class="preset-save-row">
-          <input class="preset-input" id="preset-input" type="text" placeholder="name this state…" maxlength="40">
-          <button class="preset-save-btn" onclick="savePreset('preset-input')">SAVE</button>
-        </div>
+        <div class="section-hd">SAVED PRESETS</div>
         <button class="abort-btn" id="abort-btn" onclick="abortRun()">&#9632; ABORT</button>
       </div>
       <div class="preset-list" id="preset-list"><span class="preset-empty">no presets saved</span></div>
@@ -2348,6 +2355,29 @@ body.light .panel-hd{
       <div class="faq-s-title">what is this?</div>
       <p class="faq-p">Gain is a mixing board for AI. Instead of rewriting your prompt every time, you move faders and flip switches to change <em>how</em> Claude thinks — not what you ask.</p>
       <p class="faq-p">Same question. Different settings. Completely different answer. That's the whole idea.</p>
+    </div>
+
+    <div class="faq-s">
+      <div class="faq-s-title">⊕ compare — the main feature</div>
+      <p class="faq-p">Compare is where Gain becomes a measurement tool, not just a control surface. Hit the <strong style="color:var(--magenta2)">⊕ COMPARE</strong> button in the header to open it.</p>
+      <div class="faq-track" style="border-left-color:var(--magenta)">
+        <div class="faq-track-name" style="color:var(--magenta2)">How it works</div>
+        <div class="faq-track-desc">
+          1. Pick two presets (or "Current Settings" vs a saved preset)<br>
+          2. Enter a prompt<br>
+          3. Hit RUN — the same prompt runs against both behavioral states<br>
+          4. A reasoning model scores the outputs on 5 metrics and explains the difference
+        </div>
+      </div>
+      <p class="faq-p" style="margin-top:8px">The 5 metrics: <strong style="color:var(--text)">Adherence, Depth, Clarity, Efficiency, Confidence.</strong> Each scored 0–100 with a winner called. The summary tells you exactly why the outputs behaved differently.</p>
+      <p class="faq-p">Every comparison run is saved locally and builds a statistical database of how your presets perform over time.</p>
+    </div>
+
+    <div class="faq-s">
+      <div class="faq-s-title">saving presets</div>
+      <p class="faq-p">Dial in your faders and buttons to a state you want to keep. Type a name in the <strong style="color:var(--accent2)">SAVE PRESET</strong> bar in the center panel and hit Enter or the button.</p>
+      <p class="faq-p">You can also save from inside the Compare panel — there's a save row at the top so you can lock in a state without leaving the compare workflow.</p>
+      <p class="faq-p">Presets are the foundation of Compare. The more presets you save, the more you can measure.</p>
     </div>
 
     <div class="faq-s">
