@@ -1276,6 +1276,24 @@ body.light .panel-hd{
 .console.compact .channel-bank{width:auto;flex:1;}
 .console.compact .channel-bank.right{border-left:1px solid var(--border);}
 
+/* Scale everything up for full-screen compact view */
+.console.compact .bank-hd{font-size:12px;padding:6px 16px;}
+.console.compact .ch{padding:16px 12px 12px;gap:2px;}
+.console.compact .ch-id{font-size:14px;letter-spacing:.1em;}
+.console.compact .ch-pwr{width:28px;height:28px;font-size:13px;}
+.console.compact .fader-lbl{font-size:14px;letter-spacing:.16em;font-weight:800;}
+.console.compact .fader-val{font-size:14px;font-weight:800;}
+.console.compact .fader-track{width:18px;}
+.console.compact .fader-thumb{width:88px;height:54px;}
+.console.compact .knob{width:62px;height:62px;}
+.console.compact .knob-body{inset:7px;}
+.console.compact .knob-dot{width:4px;height:17px;top:8px;transform-origin:50% 23px;}
+.console.compact .knob-lbl{font-size:13px;letter-spacing:.14em;font-weight:800;}
+.console.compact .knob-val{font-size:13px;font-weight:800;}
+.console.compact .knob-wrap{padding:12px 0 10px;}
+.console.compact .ch-btn{height:44px;font-size:14px;letter-spacing:.12em;}
+.console.compact .ch-btns{gap:6px;padding-top:8px;}
+
 /* Collapse tab — sits between left and right bank in compact mode */
 .collapse-tab{
   width:32px;flex-shrink:0;
