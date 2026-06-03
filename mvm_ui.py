@@ -1033,6 +1033,11 @@ function toggleTrack(t){
   if(btn)btn.classList.toggle('active',!nv);
   set(key,nv);
 }
+// Initialize after layout paints so offsetHeight is available
+requestAnimationFrame(()=>{
+  Object.keys(FADERS).forEach(f=>setFader(f,0.5));
+  Object.keys(KNOBS).forEach(f=>setKnob(f,0.5));
+});
 const es=new EventSource('/stream');
 es.onmessage=e=>applyState(JSON.parse(e.data));
 Object.entries(FADERS).forEach(([field,ids])=>{
