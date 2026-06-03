@@ -2187,7 +2187,7 @@ body.light .panel-hd{
         <div class="section-hd">PRESETS</div>
         <div class="preset-save-row">
           <input class="preset-input" id="preset-input" type="text" placeholder="name this state…" maxlength="40">
-          <button class="preset-save-btn" onclick="savePreset()">SAVE</button>
+          <button class="preset-save-btn" onclick="savePreset('preset-input')">SAVE</button>
         </div>
         <button class="abort-btn" id="abort-btn" onclick="abortRun()">&#9632; ABORT</button>
       </div>
@@ -2482,7 +2482,13 @@ body.light .panel-hd{
     <button class="cmp-close" onclick="closeCompare()">✕</button>
   </div>
   <div class="cmp-body">
-    <div id="cmp-no-presets" class="cmp-no-presets" style="display:none">Save at least one preset first, then come back.</div>
+    <div style="display:flex;gap:8px;align-items:center;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+      <div class="cmp-sel-label" style="flex-shrink:0;white-space:nowrap;">SAVE CURRENT AS</div>
+      <input class="cmp-prompt-input" id="cmp-save-input" type="text" placeholder="preset name…" maxlength="40" style="height:32px;font-size:13px;">
+      <button class="cmp-run-btn" onclick="savePreset('cmp-save-input','cmp-save-msg')" style="height:32px;padding:0 14px;font-size:9px;">SAVE</button>
+    </div>
+    <div id="cmp-save-msg" style="font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--accent);min-height:14px;margin-top:-8px;margin-bottom:6px;"></div>
+    <div id="cmp-no-presets" class="cmp-no-presets" style="display:none">No presets yet — save one above.</div>
     <div id="cmp-controls">
       <div class="cmp-selectors">
         <div class="cmp-sel-group">
@@ -3018,13 +3024,25 @@ function renderPresets() {
     <button class="preset-del" onclick="deletePreset('${esc(p.name)}')" title="Delete">×</button>
   </div>`).join('');
 }
-async function savePreset() {
-  const name = document.getElementById('preset-input').value.trim();
+async function savePreset(inputId, msgId) {
+  const inp = document.getElementById(inputId || 'preset-input');
+  const name = inp ? inp.value.trim() : '';
   if (!name) return;
-  const r = await fetch('/presets/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
-  const d = await r.json();
-  document.getElementById('preset-input').value = '';
-  loadPresets();
+  try {
+    const r = await fetch('/presets/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+    const d = await r.json();
+    if (d.ok) {
+      inp.value = '';
+      await loadPresets();
+      if (msgId) { const m=document.getElementById(msgId); if(m){m.textContent='Saved: '+d.name; setTimeout(()=>m.textContent='',2000);} }
+      // Refresh compare dropdowns if open
+      if (document.getElementById('cmp-panel').classList.contains('open')) populateCompareSelects();
+    } else {
+      if (msgId) { const m=document.getElementById(msgId); if(m) m.textContent='Error: '+(d.error||'failed'); }
+    }
+  } catch(e) {
+    if (msgId) { const m=document.getElementById(msgId); if(m) m.textContent='Error: '+e.message; }
+  }
 }
 async function abortRun() {
   const btn = document.getElementById('abort-btn');
@@ -3044,7 +3062,7 @@ async function deletePreset(name) {
   await fetch('/presets/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
   loadPresets();
 }
-document.getElementById('preset-input').addEventListener('keydown', e => { if (e.key === 'Enter') savePreset(); });
+document.getElementById('preset-input').addEventListener('keydown', e => { if (e.key === 'Enter') savePreset('preset-input'); });
 loadPresets();
 
 // ── COPY ──────────────────────────────────────────────────────────
@@ -3409,6 +3427,9 @@ function renderCompareScores(scores, nameA, nameB) {
 }
 document.getElementById('cmp-prompt').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') runCompare();
+});
+document.getElementById('cmp-save-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') savePreset('cmp-save-input', 'cmp-save-msg');
 });
 
 // ── Auth ──────────────────────────────────────────────────
