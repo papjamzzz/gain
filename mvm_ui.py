@@ -2734,17 +2734,15 @@ function applyState(s) {
   setButtons('stance', s.stance);
   setButtons('filter', s.filter);
   setButtons('voice',  s.voice);
-  const parts = [];
-  if (s.mode)   parts.push(`Mode: ${s.mode}`);
-  if (s.stance) parts.push(`Stance: ${s.stance}`);
-  if (s.filter) parts.push(`Filter: ${s.filter}`);
-  if (s.voice)  parts.push(`Voice: ${s.voice}`);
-  parts.push(`Effort: ${(s.intensity??0.5).toFixed(2)}`);
-  parts.push(`Confidence: ${(s.certainty??0.5).toFixed(2)}`);
-  parts.push(`Scope: ${(s.scope??0.5).toFixed(2)}`);
-  parts.push(`Verbosity: ${(s.room??0.5).toFixed(2)}`);
+  const tk = (label, btn, val) => btn ? `${label}: ${btn} · ${val}` : `${label}: ${val}`;
+  const parts = [
+    tk('MODE',       s.mode,   (s.intensity??0.5).toFixed(2)),
+    tk('CONFIDENCE', s.stance, (s.certainty??0.5).toFixed(2)),
+    tk('SCOPE',      s.filter, (s.scope??0.5).toFixed(2)),
+    tk('VOICE',      s.voice,  (s.room??0.5).toFixed(2)),
+  ];
   const settingsEl = document.getElementById('hdr-settings');
-  if (settingsEl) settingsEl.textContent = parts.length ? parts.join('  ·  ') : 'All defaults — baseline';
+  if (settingsEl) settingsEl.textContent = parts.join('  ·  ');
   setPill('pill-mode',   s.mode  ||'—', PILL_C[0]);
   setPill('pill-stance', s.stance||'—', PILL_C[1]);
   setPill('pill-filter', s.filter||'—', PILL_C[2]);
