@@ -4,7 +4,9 @@
 ---
 
 ## What This Is
-Gain is a behavioral mixing board for AI coding agents. Four tracks, each controlling a different dimension of how Claude thinks: Mode, Confidence, Scope, Voice. Faders, knobs, and buttons write to a system prompt in real time. Same task, different state — measurably different output.
+Gain is a behavioral mixing board for AI. Four tracks control different dimensions of how Claude thinks: Mode, Confidence, Scope, Voice. Faders, knobs, and buttons write to a system prompt. Same prompt, different state — measurably different output.
+
+**The core feature is Compare** — run the same prompt through two saved presets, get scored output on 6 metrics (Adherence, Depth, Clarity, Efficiency, Confidence, Token Efficiency) from a reasoning model, plus raw reply length and token counts. The scoring model writes a plain-English behavioral diagnosis. This is the product.
 
 This repo is everything: landing page (SaaS), mixer UI, CLI tool, MIDI bridge.
 
@@ -12,22 +14,23 @@ This repo is everything: landing page (SaaS), mixer UI, CLI tool, MIDI bridge.
 > "Re-entry: gain"
 
 ## Current Status
-🔨 Active — landing page live, mixer UI rebranded, SaaS auth next
+🔨 Active — Compare engine live, preset system working, nanoKONTROL2 wired, scoring + stats database building
 
 ## Stack
 - Python + Flask
 - Mixer UI: port 5570 (mvm_ui.py), binds 0.0.0.0
 - Landing page: port 5567 (app.py), binds 127.0.0.1
-- Dark theme, Inter + Abril Fatface + JetBrains Mono fonts
+- Dark theme, Inter + Abril Fatface fonts
 - CSS variables, no external frameworks
 
 ## File Structure
 ```
 gain/
 ├── app.py              # Landing page + waitlist Flask app (port 5567)
-├── mvm_ui.py           # Mixer UI Flask app (port 5570)
-├── ctrl                # CLI tool — reads state.json, calls claude --print
-├── nano_bridge.py      # Korg nanoKONTROL2 MIDI bridge
+├── mvm_ui.py           # Mixer UI Flask app (port 5570) — THE MAIN FILE
+├── ctrl                # CLI tool — reads state.json, builds system prompts, calls claude
+├── nano_bridge.py      # Korg nanoKONTROL2 MIDI bridge (PRIMARY hardware controller)
+├── mpk_bridge.py       # MPK Mini 3 bridge (secondary, no LED feedback)
 ├── foot_bridge.py      # Foot controller bridge
 ├── templates/
 │   └── index.html      # Landing page HTML
@@ -46,13 +49,13 @@ gain/
 # Mixer UI (auto-starts via LaunchAgent com.papjamzzz.gain)
 python3 /Users/miahsm1/gain/mvm_ui.py
 
+# nanoKONTROL2 bridge (auto-starts via LaunchAgent com.papjamzzz.gain.nano)
+python3 /Users/miahsm1/gain/nano_bridge.py --start
+
 # Landing page
 cd ~/gain && make run
 
-# MIDI bridge
-ctrl nano --start
-
-# Run a task
+# Run a task via CLI
 ctrl run "your task here"
 ```
 
@@ -63,11 +66,15 @@ Production: gain.creativekonsoles.com
 
 ## Shared State
 `~/.streamfader/state.json` — shared between mixer UI, MIDI bridge, and CLI.
+`~/.streamfader/presets/` — saved preset files (one JSON per preset).
+`~/.streamfader/comparisons.json` — comparison run log, builds stats database over time.
 
 ## Key Infrastructure
 - `ctrl` symlink: `/opt/homebrew/bin/ctrl` → `/Users/miahsm1/gain/ctrl`
-- LaunchAgent: `com.papjamzzz.gain` — auto-starts mixer on boot
-- Old `~/control` repo: archived at papjamzzz/control on GitHub
+- LaunchAgent: `com.papjamzzz.gain` — auto-starts mixer UI on boot
+- LaunchAgent: `com.papjamzzz.gain.nano` — auto-starts nanoKONTROL2 bridge on boot
+- Logs: `~/.streamfader/control.log` (mixer), `~/.streamfader/nano.log` (MIDI bridge)
+- State resets to neutral (all 0.5, no buttons) on every server start by design
 
 ## GitHub
 - Repo: papjamzzz/gain
@@ -76,34 +83,49 @@ Production: gain.creativekonsoles.com
 ## Track Layout
 | Track | Fader | Knob | Buttons |
 |-------|-------|------|---------|
-| Track 1 — MODE | Intensity | Depth | EXPLORE / MUTE / BUILD |
-| Track 2 — CONF | Certainty | Risk | LIST / MUTE / DECIDE |
-| Track 3 — SCOPE | Scope | Bandwidth | FILE / MUTE / PROJECT |
-| Track 4 — VOICE | Room | Decay | DIRECT / MUTE / OPEN |
+| Track 1 — MODE | Effort (intensity) | Thinking Time (depth) | EXPLORE / MUTE / BUILD |
+| Track 2 — CONFIDENCE | Confidence (certainty) | Boldness (risk) | LIST / MUTE / DECIDE |
+| Track 3 — SCOPE | Zoom Level (scope) | Context Size (bandwidth) | FILE / MUTE / PROJECT |
+| Track 4 — VOICE | Verbosity (room) | Memory Persistence (decay) | DIRECT / MUTE / OPEN |
 
-## nanoKONTROL2 Mapping
+## nanoKONTROL2 Mapping (PRIMARY — wins over MPK)
 - Faders 1–4: Intensity, Certainty, Scope, Room
 - Knobs 1–4: Depth, Risk, Bandwidth, Decay
 - S buttons: EXPLORE / LIST / FILE / DIRECT
 - M buttons: Mute T1 / T2 / T3 / T4
 - R buttons: BUILD / DECIDE / PROJECT / OPEN
 - PLAY: replay last task | STOP: kill running process
+- LED feedback: fully wired via output port
+
+## Compare Engine
+- Route: POST /compare — SSE stream, runs prompt against two presets sequentially
+- Scoring: claude-sonnet-4-6 scores 6 metrics (0-100) with winner + summary
+- Metrics: Adherence, Depth, Clarity, Efficiency, Confidence, Token Efficiency
+- Token counts: pulled from API usage data (hard numbers, not estimated)
+- Reply length: word count from output text
+- Stats log: every run appends to ~/.streamfader/comparisons.json
+- Stats route: GET /compare/stats — per-preset averages across all past runs
 
 ## Roadmap
 ### Done
 - [x] Landing page with waitlist
-- [x] Mixer UI (mvm_ui.py) — all four tracks, muting, physical controller
-- [x] CLI tool (ctrl) — reads state.json, builds system prompts, calls claude
-- [x] MIDI bridge (nano_bridge.py)
-- [x] Rebranded from Control → Gain
-- [x] Live prompts removed, output window expanded
+- [x] Mixer UI — all four tracks, muting, physical controller
+- [x] CLI tool (ctrl) — system prompt builder, claude integration
+- [x] nanoKONTROL2 bridge with LED feedback (PRIMARY controller)
+- [x] Preset save/load system (accessible from main UI and Compare panel)
+- [x] Compare engine — A/B preset comparison with 6-metric AI scoring
+- [x] Token Efficiency metric + raw token/word count stats
+- [x] Scoring stats database (local JSON, accumulates over time)
+- [x] Onboarding rewritten around Compare + presets + scoring
+- [x] GAIN all-caps, 72px header
+- [x] State resets to neutral on every server start
+- [x] Screen-recording optimized typography
 
 ### Next
 - [ ] Clerk auth (login/signup)
 - [ ] Supabase (cloud state + presets)
 - [ ] Stripe billing tier wiring
-- [ ] Preset save/load system
 - [ ] Model selector dial
 
 ## Last Session
-2026-05-30 — Repo merged (control → gain). UI polish: live prompts removed, output expanded to JetBrains Mono readout, knob depth improved, palette brightened, Track 1–4 labels, bank headers removed, iPad optimizations, ? button resized. Landing page built with waitlist. Clerk auth is next.
+2026-06-03 — Major session. Built Compare engine from scratch (A/B preset comparison, 6-metric AI scoring, token efficiency, reply length + token count stats). nanoKONTROL2 wired back in as primary controller (beats MPK Mini — better layout, LED feedback). Preset save made accessible from Compare panel. Typography overhauled for screen recording. GAIN all-caps 72px. Onboarding rewritten around Compare/presets/scoring as the product story. State resets to neutral on every server start.
