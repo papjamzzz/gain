@@ -3586,26 +3586,26 @@ function toggleCompact() {
 <div id="onboard-overlay">
   <div class="ob-card active" id="ob-1">
     <div class="ob-num">01 of 04</div>
-    <div class="ob-title">Welcome to Gain.</div>
-    <div class="ob-body">This is a mixing board for AI.<br>Not a chat window. Not a prompt builder.<br>A board you perform on.</div>
-    <button class="ob-next" onclick="obNext(2)">Got it →</button>
+    <div class="ob-title">Same prompt.<br>Two states.<br>Measurable difference.</div>
+    <div class="ob-body">GAIN is a behavioral mixing board for AI. Every fader changes <em>how</em> Claude thinks — not what you ask.<br><br>The same question gets completely different answers depending on where the dials are set.</div>
+    <button class="ob-next" onclick="obNext(2)">How? →</button>
   </div>
   <div class="ob-card" id="ob-2">
     <div class="ob-num">02 of 04</div>
-    <div class="ob-title">Move a fader.<br>Change how it thinks.</div>
-    <div class="ob-body">Each track controls a different dimension — how hard it works, how confident it acts, how wide it looks, how it talks to you.<br><br>Same question. Different settings. Completely different answer.</div>
-    <button class="ob-next" onclick="obNext(3)">Keep going →</button>
+    <div class="ob-title">Dial it in.<br>Save it.</div>
+    <div class="ob-body">Move the faders until the AI behaves the way you want. Name that state and save it as a preset.<br><br>That preset is now a reproducible behavioral profile — the same settings, any time, any prompt.</div>
+    <button class="ob-next" onclick="obNext(3)">Then what? →</button>
   </div>
   <div class="ob-card" id="ob-3">
     <div class="ob-num">03 of 04</div>
-    <div class="ob-title">Try Preview Run first.</div>
-    <div class="ob-body">It's completely safe. No files touched. Just type something in the bottom box, hit RUN, and see what happens.<br><br>Move a fader. Run it again. Feel the difference.</div>
-    <button class="ob-next" onclick="obNext(4)">Almost there →</button>
+    <div class="ob-title">Hit COMPARE.</div>
+    <div class="ob-body">Pick two presets. Enter a prompt. Run it.<br><br>The same question goes through both behavioral states — and you see exactly how the outputs diverge. Side by side. No guessing.</div>
+    <button class="ob-next" onclick="obNext(4)">And then? →</button>
   </div>
   <div class="ob-card" id="ob-4">
     <div class="ob-num">04 of 04</div>
-    <div class="ob-title">You're ready.<br>Go make something.</div>
-    <div class="ob-body">The ? button in the top right opens this guide anytime you need it.<br><br>Now go dial it in.</div>
+    <div class="ob-title">A reasoning AI<br>scores both outputs.</div>
+    <div class="ob-body">Adherence. Depth. Clarity. Efficiency. Confidence.<br><br>Each scored 0–100. A winner called. A plain-English explanation of exactly why the two states produced different results.<br><br>That's where the value is.</div>
     <button class="ob-next" onclick="obFinish()">Let's go ✦</button>
   </div>
 </div>
@@ -3615,7 +3615,7 @@ function toggleCompact() {
 <script>
 // ── Onboarding ────────────────────────────────────────────
 (function initOnboard() {
-  if (localStorage.getItem('gain_onboarded')) return;
+  if (localStorage.getItem('gain_onboarded') === 'v2') return;
   document.getElementById('onboard-overlay').classList.add('active');
 })();
 
@@ -3627,7 +3627,7 @@ function obNext(n) {
 
 function obFinish() {
   document.getElementById('onboard-overlay').classList.remove('active');
-  localStorage.setItem('gain_onboarded', '1');
+  localStorage.setItem('gain_onboarded', 'v2');
   launchFireworks();
 }
 
