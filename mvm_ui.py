@@ -32,6 +32,13 @@ PID_FILE     = Path.home() / ".streamfader" / "ctrl.pid"
 PORT  = int(os.environ.get("PORT", 5570))
 MODEL = os.environ.get("CTRL_MODEL", "claude-sonnet-4-6")
 
+MODELS_AVAILABLE = {
+    "haiku":  "claude-haiku-4-5-20251001",
+    "sonnet": "claude-sonnet-4-6",
+    "opus":   "claude-opus-4-6",
+}
+_active_model = MODEL  # mutable, changed via /model POST
+
 
 # Load build_system_prompt from ctrl script without importing the whole CLI
 import importlib.machinery
@@ -424,7 +431,7 @@ def run_task():
         try:
             client = _anthropic.Anthropic(api_key=api_key)
             with client.messages.stream(
-                model=MODEL,
+                model=_active_model,
                 max_tokens=4096,
                 system=system,
                 messages=[{"role": "user", "content": task}],
@@ -469,7 +476,7 @@ def exec_task():
             collected = []
             try:
                 with client.messages.stream(
-                    model=MODEL,
+                    model=_active_model,
                     max_tokens=8096,
                     system=system,
                     tools=TOOLS,
@@ -625,7 +632,7 @@ def compare_presets():
         tokens_a  = 0
         try:
             with client.messages.stream(
-                model=MODEL, max_tokens=2048,
+                model=_active_model, max_tokens=2048,
                 system=_build_prompt(state_a),
                 messages=[{"role": "user", "content": prompt}],
             ) as s:
@@ -647,7 +654,7 @@ def compare_presets():
         tokens_b  = 0
         try:
             with client.messages.stream(
-                model=MODEL, max_tokens=2048,
+                model=_active_model, max_tokens=2048,
                 system=_build_prompt(state_b),
                 messages=[{"role": "user", "content": prompt}],
             ) as s:
@@ -691,7 +698,7 @@ def compare_presets():
                 '"overall_winner":"a","summary":"2-3 sentences on the key behavioral differences"}'
             )
             resp = client.messages.create(
-                model=MODEL, max_tokens=512,
+                model=_active_model, max_tokens=512,
                 messages=[{"role": "user", "content": score_prompt}],
             )
             raw = resp.content[0].text.strip()
@@ -854,8 +861,25 @@ def proto_view():
 
 @app.route("/health")
 def health():
-    return jsonify({"ok": True, "model": MODEL,
+    return jsonify({"ok": True, "model": _active_model,
                     "api_key_set": bool(os.environ.get("ANTHROPIC_API_KEY"))})
+
+
+@app.route("/model", methods=["GET"])
+def get_model():
+    slug = next((k for k, v in MODELS_AVAILABLE.items() if v == _active_model), "sonnet")
+    return jsonify({"model": _active_model, "slug": slug})
+
+
+@app.route("/model", methods=["POST"])
+def set_model():
+    global _active_model
+    data = request.get_json() or {}
+    slug = data.get("slug", "").strip().lower()
+    if slug not in MODELS_AVAILABLE:
+        return jsonify({"error": f"Unknown model slug '{slug}'"}), 400
+    _active_model = MODELS_AVAILABLE[slug]
+    return jsonify({"ok": True, "model": _active_model, "slug": slug})
 
 
 # ── LOGIN HTML ────────────────────────────────────────────────────────────────
@@ -2543,6 +2567,17 @@ body.light .panel-hd{
   letter-spacing:.01em;
 }
 .resp-box .err{color:#E05050;font-weight:600;}
+/* MODEL DIAL */
+.model-dial-wrap{display:flex;align-items:center;gap:8px;padding:8px 14px 7px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.model-dial-lbl{font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--chrome);white-space:nowrap;flex-shrink:0;}
+.model-dial-btns{display:flex;gap:3px;flex:1;}
+.model-dial-btn{flex:1;padding:5px 0;border:1px solid rgba(0,196,232,.18);border-radius:4px;background:transparent;color:var(--chrome);font-size:9px;font-weight:800;letter-spacing:.12em;cursor:pointer;transition:all .15s;text-transform:uppercase;font-family:inherit;}
+.model-dial-btn:hover{border-color:rgba(0,196,232,.5);color:var(--accent);}
+.model-dial-btn.active{background:rgba(0,196,232,.1);border-color:var(--accent);color:var(--accent);box-shadow:0 0 8px rgba(0,196,232,.2);}
+.model-dial-btn.active.opus{background:rgba(167,139,250,.1);border-color:#A78BFA;color:#A78BFA;box-shadow:0 0 8px rgba(167,139,250,.2);}
+.model-dial-btn.active.haiku{background:rgba(94,232,138,.08);border-color:#5EE88A;color:#5EE88A;box-shadow:0 0 8px rgba(94,232,138,.15);}
+body.light .model-dial-btn{color:#5A7898;border-color:rgba(0,126,120,.2);}
+body.light .model-dial-btn.active{background:rgba(0,126,120,.08);border-color:var(--accent);color:var(--accent);}
 /* PRESETS */
 .presets-wrap{padding:6px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .presets-hd-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
@@ -2906,6 +2941,15 @@ body.light .panel-hd{
     </div>
 
     <!-- PRESETS -->
+    <div class="model-dial-wrap">
+      <div class="model-dial-lbl">MODEL</div>
+      <div class="model-dial-btns">
+        <button class="model-dial-btn haiku" data-slug="haiku" onclick="selectModel('haiku')">HAIKU</button>
+        <button class="model-dial-btn sonnet active" data-slug="sonnet" onclick="selectModel('sonnet')">SONNET</button>
+        <button class="model-dial-btn opus" data-slug="opus" onclick="selectModel('opus')">OPUS</button>
+      </div>
+    </div>
+
     <div class="presets-wrap">
       <div class="preset-save-center">
         <input class="preset-input" id="preset-input" type="text" placeholder="name this state and save it…" maxlength="40">
@@ -3813,6 +3857,27 @@ async function deletePreset(name) {
 }
 document.getElementById('preset-input').addEventListener('keydown', e => { if (e.key === 'Enter') savePreset('preset-input'); });
 loadPresets();
+
+// ── MODEL DIAL ────────────────────────────────────────────────────
+async function selectModel(slug) {
+  try {
+    await fetch('/model', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({slug})});
+  } catch(e) {}
+  document.querySelectorAll('.model-dial-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.slug === slug);
+  });
+}
+(async function initModelDial() {
+  try {
+    const r = await fetch('/model');
+    const d = await r.json();
+    if (d.slug) {
+      document.querySelectorAll('.model-dial-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.slug === d.slug);
+      });
+    }
+  } catch(e) {}
+})();
 
 // ── COPY ──────────────────────────────────────────────────────────
 function copyResp() {
