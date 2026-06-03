@@ -373,8 +373,6 @@ def auth_callback():
 
 @app.route("/app")
 def app_view():
-    # Auth is validated client-side via JS + token in localStorage
-    # API routes (/set, /run, /stream etc.) enforce server-side auth
     return HTML
 
 @app.route("/")
@@ -856,7 +854,7 @@ def stripe_webhook():
 
 @app.route("/proto")
 def proto_view():
-    return PROTO_HTML
+    return HTML_LEGACY
 
 
 @app.route("/health")
@@ -990,15 +988,15 @@ LOGIN_HTML = """<!DOCTYPE html>
 </body>
 </html>""".replace('__SUPABASE_URL__', SUPABASE_URL).replace('__SUPABASE_KEY__', SUPABASE_ANON)
 
-# ── PROTO HTML ────────────────────────────────────────────────────────────────
+# ── MAIN HTML ─────────────────────────────────────────────────────────────────
 
-PROTO_HTML = """<!DOCTYPE html>
+HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>GAIN — Prototype</title>
-<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>Gain</title>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#060A0F;font-family:'Inter',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;color:#D8EAF8;user-select:none;}
@@ -1163,6 +1161,57 @@ body.light .cmp-panel{background:#F0EDE8;border-top-color:rgba(176,32,200,.35);}
 body.light .cmp-hd{background:#E8E5E0;}
 body.light .cmp-save-input,.body.light .cmp-select,.body.light .cmp-prompt-input{background:#F8F6F2;border-color:rgba(0,120,115,.2);color:#1C2B3A;}
 body.light .cmp-out-box{background:#F8F6F2;border-color:rgba(0,0,0,.1);color:#1C2B3A;}
+/* ── Compare open button — flagship feature ── */
+@keyframes cmp-pulse{
+  0%,100%{box-shadow:0 0 10px rgba(217,70,239,.35),0 0 22px rgba(217,70,239,.18),inset 0 0 8px rgba(217,70,239,.12);}
+  50%{box-shadow:0 0 22px rgba(217,70,239,.9),0 0 45px rgba(217,70,239,.55),0 0 80px rgba(217,70,239,.25),inset 0 0 18px rgba(217,70,239,.22);}
+}
+.cmp-open-btn{
+  height:30px;padding:0 14px;border-radius:3px;
+  border:2px solid rgba(217,70,239,.95);
+  background:linear-gradient(180deg,rgba(145,35,190,.38) 0%,rgba(100,15,150,.52) 100%);
+  color:#F0ABFF;font-size:9px;font-weight:900;letter-spacing:.18em;
+  text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap;
+  text-shadow:0 0 10px rgba(255,180,255,1),0 0 22px rgba(217,70,239,.9);
+  flex-shrink:0;touch-action:manipulation;
+  animation:cmp-pulse 2s ease-in-out infinite;
+  font-family:'Inter',sans-serif;margin-left:6px;
+}
+.cmp-open-btn:hover{
+  background:linear-gradient(180deg,rgba(180,50,220,.5) 0%,rgba(130,20,180,.6) 100%);
+  border-color:#F0ABFF;animation:none;
+  box-shadow:0 0 30px rgba(217,70,239,1),0 0 60px rgba(217,70,239,.6),inset 0 0 24px rgba(217,70,239,.3);
+}
+body.light .cmp-open-btn{border-color:rgba(176,32,200,.85);background:linear-gradient(180deg,rgba(176,32,200,.18) 0%,rgba(140,10,170,.28) 100%);color:#B020C8;text-shadow:none;}
+/* ── Expand / collapse ── */
+.expand-btn{height:30px;width:30px;border-radius:3px;border:1px solid rgba(0,200,192,.35);background:rgba(0,200,192,.06);color:#00DDD4;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;margin-left:6px;flex-shrink:0;}
+.expand-btn:hover{border-color:#00DDD4;background:rgba(0,200,192,.14);}
+/* ── Abort ── */
+.abort-btn{height:34px;padding:0 12px;border-radius:3px;border:1px solid rgba(200,60,60,.35);background:transparent;color:rgba(200,80,80,.6);font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:all .12s;font-family:'Inter',sans-serif;flex-shrink:0;}
+.abort-btn:hover{border-color:#CC2020;color:#CC2020;background:rgba(200,40,40,.07);}
+/* ── iOS safe area ── */
+@supports(padding:env(safe-area-inset-bottom)){body{padding-bottom:env(safe-area-inset-bottom);}}
+/* ── iPad / touch ── */
+@media(hover:none){
+  .col-btn{min-height:44px;}
+  .bb-btn,.abort-btn{min-height:40px;}
+  .cmp-open-btn{min-height:40px;}
+  .expand-btn{width:40px;height:40px;}
+}
+@media(max-width:1366px) and (pointer:coarse){
+  body{overscroll-behavior:none;}
+  .hdr{height:56px;}
+  .brand{font-size:32px;}
+  .cmp-panel{width:100%;bottom:-100%;height:88vh;}
+  .cmp-panel.open{bottom:0;}
+}
+@media(max-width:768px){.hdr-center{display:none;}}
+/* ── 4K / super HD ── */
+@media(min-width:2000px){
+  html{font-size:125%;}
+  .hdr{height:80px;}
+  .brand{font-size:60px;}
+}
 </style>
 </head>
 <body>
@@ -1173,9 +1222,9 @@ body.light .cmp-out-box{background:#F8F6F2;border-color:rgba(0,0,0,.1);color:#1C
     <div class="hdr-vals" id="hdr-vals">—</div>
   </div>
   <button class="hdr-action" onclick="resetDefaults()">RESET</button>
-  <button class="hdr-action cmp-trigger" onclick="openCompare()">⊕ COMPARE</button>
+  <button class="cmp-open-btn" onclick="openCompare()">⊕ COMPARE</button>
   <button class="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
-  <div class="proto-tag">PROTOTYPE</div>
+  <button class="expand-btn" id="expand-btn" onclick="toggleCompact()" title="Expand / Collapse">⊟</button>
 </div>
 <div class="stage">
   <div class="col t1">
@@ -1283,6 +1332,7 @@ body.light .cmp-out-box{background:#F8F6F2;border-color:rgba(0,0,0,.1);color:#1C
     <div class="bb-row">
       <input class="bb-input" id="run-input" type="text" placeholder="run a prompt with current settings…" onkeydown="if(event.key==='Enter')runTask()">
       <button class="bb-btn" id="run-btn" onclick="runTask()">RUN</button>
+      <button class="abort-btn" id="abort-btn" onclick="abortTask()" title="Stop running task">■ STOP</button>
     </div>
     <div class="run-status" id="run-status"></div>
     <div class="resp-box" id="resp-box"></div>
@@ -1325,6 +1375,8 @@ body.light .cmp-out-box{background:#F8F6F2;border-color:rgba(0,0,0,.1);color:#1C
 </div>
 
 <script>
+const _tok=localStorage.getItem('sb-access-token')||'';
+function getToken(){return localStorage.getItem('sb-access-token')||'';}
 const THUMB_H=4,FINE_MULT=0.25,KNOB_SENS=0.90,KNOB_DETENT=0.022;
 const FADERS={
   intensity:{fill:'ff-intensity',thumb:'fth-intensity',val:'fv-intensity',track:'ft-intensity'},
@@ -1402,7 +1454,7 @@ requestAnimationFrame(()=>{
   Object.keys(FADERS).forEach(f=>setFader(f,0.5));
   Object.keys(KNOBS).forEach(f=>setKnob(f,0.5));
 });
-const es=new EventSource('/stream');
+const es=new EventSource('/stream'+(_tok?'?token='+encodeURIComponent(_tok):''));
 es.onmessage=e=>applyState(JSON.parse(e.data));
 Object.entries(FADERS).forEach(([field,ids])=>{
   const trackEl=document.getElementById(ids.track);
@@ -1566,7 +1618,9 @@ async function runCompare(){
   document.getElementById('cmp-label-a').textContent=pa==='__current__'?'CURRENT SETTINGS':pa.toUpperCase();
   document.getElementById('cmp-label-b').textContent=pb==='__current__'?'CURRENT SETTINGS':pb.toUpperCase();
   try{
-    const resp=await fetch('/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset_a:pa,preset_b:pb,prompt})});
+    const _cmpTok=getToken();const _cmpHdrs={'Content-Type':'application/json'};
+    if(_cmpTok)_cmpHdrs['Authorization']='Bearer '+_cmpTok;
+    const resp=await fetch('/compare',{method:'POST',headers:_cmpHdrs,body:JSON.stringify({preset_a:pa,preset_b:pb,prompt})});
     const reader=resp.body.getReader();const dec=new TextDecoder();let buf='';
     while(true){
       const{done,value}=await reader.read();if(done)break;
@@ -1602,6 +1656,17 @@ async function runCompare(){
   }catch(e){if(status)status.textContent='✕ '+e.message;}
   if(btn)btn.disabled=false;
 }
+async function abortTask(){
+  try{await fetch('/abort',{method:'POST'});}catch(e){}
+}
+let _compact=false;
+function toggleCompact(){
+  _compact=!_compact;
+  const btn=document.getElementById('expand-btn');
+  if(btn)btn.textContent=_compact?'⊞':'⊟';
+  const bb=document.querySelector('.bottom-bar');
+  if(bb)bb.style.display=_compact?'none':'flex';
+}
 loadPresets();
 (function(){if(localStorage.getItem('gain_theme')==='light')document.body.classList.add('light');})();
 function toggleTheme(){const l=document.body.classList.toggle('light');localStorage.setItem('gain_theme',l?'light':'dark');}
@@ -1610,9 +1675,9 @@ function toggleTheme(){const l=document.body.classList.toggle('light');localStor
 </html>"""
 
 
-# ── HTML ──────────────────────────────────────────────────────────────────────
+# ── HTML (legacy — served at /proto for rollback) ─────────────────────────────
 
-HTML = r"""<!DOCTYPE html>
+HTML_LEGACY = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
