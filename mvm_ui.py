@@ -7,6 +7,7 @@ import os
 import signal
 import importlib.util
 from pathlib import Path
+from datetime import datetime
 from flask import Flask, Response, request, jsonify, redirect, url_for
 from functools import wraps
 
@@ -285,8 +286,7 @@ def index():
 
 @app.route("/stream")
 def stream():
-    token   = request.args.get("token", "")
-    user_id = _get_user_id(token) if token else None
+    user_id = None  # always use local state.json — skip Supabase lookup to avoid blocking
     def generate():
         last = {}
         while True:
@@ -318,8 +318,7 @@ def run_task():
     if not task:
         return jsonify({"error": "No task provided"}), 400
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    token   = _token_from_request()
-    user_id = _get_user_id(token) if token else None
+    user_id = None  # always use local state.json — skip Supabase lookup to avoid blocking
 
     def generate():
         if not _anthropic:
@@ -477,6 +476,164 @@ def delete_preset():
     if f.exists():
         f.unlink()
     return jsonify({"ok": True})
+
+
+COMPARE_LOG = Path.home() / ".streamfader" / "comparisons.json"
+
+@app.route("/compare", methods=["POST"])
+def compare_presets():
+    data     = request.get_json() or {}
+    preset_a = data.get("preset_a", "").strip()
+    preset_b = data.get("preset_b", "").strip()
+    prompt   = data.get("prompt", "").strip()
+    if not prompt:
+        return jsonify({"error": "No prompt provided"}), 400
+
+    def _load(name):
+        if name == "__current__":
+            return read_state()
+        f = PRESETS_DIR / f"{name}.json"
+        return json.loads(f.read_text()) if f.exists() else None
+
+    state_a = _load(preset_a)
+    state_b = _load(preset_b)
+    if state_a is None:
+        return jsonify({"error": f"Preset '{preset_a}' not found"}), 404
+    if state_b is None:
+        return jsonify({"error": f"Preset '{preset_b}' not found"}), 404
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+
+    def generate():
+        if not _anthropic:
+            yield f"data: {json.dumps({'error': 'anthropic not installed'})}\n\n"; return
+        if not api_key:
+            yield f"data: {json.dumps({'error': 'ANTHROPIC_API_KEY not set'})}\n\n"; return
+        client = _anthropic.Anthropic(api_key=api_key)
+
+        # ── Run A ──────────────────────────────────────────────
+        yield f"data: {json.dumps({'phase': 'a_start'})}\n\n"
+        output_a = ""
+        try:
+            with client.messages.stream(
+                model=MODEL, max_tokens=2048,
+                system=_build_prompt(state_a),
+                messages=[{"role": "user", "content": prompt}],
+            ) as s:
+                for text in s.text_stream:
+                    output_a += text
+                    yield f"data: {json.dumps({'phase': 'a', 'text': text})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"; return
+        yield f"data: {json.dumps({'phase': 'a_done'})}\n\n"
+
+        # ── Run B ──────────────────────────────────────────────
+        yield f"data: {json.dumps({'phase': 'b_start'})}\n\n"
+        output_b = ""
+        try:
+            with client.messages.stream(
+                model=MODEL, max_tokens=2048,
+                system=_build_prompt(state_b),
+                messages=[{"role": "user", "content": prompt}],
+            ) as s:
+                for text in s.text_stream:
+                    output_b += text
+                    yield f"data: {json.dumps({'phase': 'b', 'text': text})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"; return
+        yield f"data: {json.dumps({'phase': 'b_done'})}\n\n"
+
+        # ── Score ──────────────────────────────────────────────
+        yield f"data: {json.dumps({'phase': 'scoring'})}\n\n"
+        try:
+            score_prompt = (
+                "You are a behavioral evaluation system for AI outputs.\n"
+                "The SAME prompt was run against two different AI behavioral configurations.\n\n"
+                f"PROMPT: {prompt}\n\n"
+                f"OUTPUT A (Preset: {preset_a}):\n{output_a}\n\n"
+                f"OUTPUT B (Preset: {preset_b}):\n{output_b}\n\n"
+                "Score each output on these 5 metrics (0-100):\n"
+                "1. ADHERENCE — Did it follow the request precisely?\n"
+                "2. DEPTH — How thoroughly did it address the topic?\n"
+                "3. CLARITY — How clear and well-structured is the output?\n"
+                "4. EFFICIENCY — Did it say what needed saying without waste?\n"
+                "5. CONFIDENCE — How decisive and assured is the output tone?\n\n"
+                "Return ONLY valid JSON with no text before or after:\n"
+                '{"adherence":{"a":0,"b":0,"winner":"a"},'
+                '"depth":{"a":0,"b":0,"winner":"a"},'
+                '"clarity":{"a":0,"b":0,"winner":"a"},'
+                '"efficiency":{"a":0,"b":0,"winner":"a"},'
+                '"confidence":{"a":0,"b":0,"winner":"a"},'
+                '"overall_winner":"a","summary":"2-3 sentences on the key behavioral differences"}'
+            )
+            resp = client.messages.create(
+                model=MODEL, max_tokens=512,
+                messages=[{"role": "user", "content": score_prompt}],
+            )
+            raw = resp.content[0].text.strip()
+            if "```" in raw:
+                parts = raw.split("```")
+                raw = parts[1] if len(parts) > 1 else parts[0]
+                if raw.startswith("json"):
+                    raw = raw[4:].strip()
+            scores = json.loads(raw)
+            try:
+                existing = json.loads(COMPARE_LOG.read_text()) if COMPARE_LOG.exists() else []
+                existing.append({
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "prompt": prompt,
+                    "preset_a": preset_a,
+                    "preset_b": preset_b,
+                    "scores": scores,
+                })
+                COMPARE_LOG.parent.mkdir(parents=True, exist_ok=True)
+                COMPARE_LOG.write_text(json.dumps(existing, indent=2))
+            except Exception:
+                pass
+            yield f"data: {json.dumps({'phase': 'scores', 'scores': scores})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'phase': 'score_error', 'error': str(e)})}\n\n"
+
+        yield f"data: {json.dumps({'phase': 'done'})}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/compare/stats")
+def compare_stats():
+    if not COMPARE_LOG.exists():
+        return jsonify({"runs": 0, "presets": {}})
+    try:
+        comparisons = json.loads(COMPARE_LOG.read_text())
+    except Exception:
+        return jsonify({"runs": 0, "presets": {}})
+    metrics = ["adherence", "depth", "clarity", "efficiency", "confidence"]
+    preset_stats = {}
+    for comp in comparisons:
+        for side, name in [("a", comp.get("preset_a")), ("b", comp.get("preset_b"))]:
+            if not name or name == "__current__":
+                continue
+            if name not in preset_stats:
+                preset_stats[name] = {m: [] for m in metrics}
+                preset_stats[name]["wins"] = 0
+                preset_stats[name]["runs"] = 0
+            preset_stats[name]["runs"] += 1
+            s = comp.get("scores", {})
+            for m in metrics:
+                v = s.get(m, {}).get(side)
+                if v is not None:
+                    preset_stats[name][m].append(v)
+            if s.get("overall_winner") == side:
+                preset_stats[name]["wins"] += 1
+    result = {}
+    for p, d in preset_stats.items():
+        result[p] = {"runs": d["runs"], "wins": d["wins"]}
+        for m in metrics:
+            vals = d[m]
+            result[p][m] = round(sum(vals) / len(vals), 1) if vals else 0
+    return jsonify({"runs": len(comparisons), "presets": result})
+
 
 @app.route("/health")
 def health():
@@ -780,21 +937,33 @@ body.light .channel-bank{
 }
 body.light .bank-hd{background:#E2DED8;}
 body.light .section-hd{color:var(--chrome);}
-body.light .ch-hdr-row{background:#DDD9D3;border-color:var(--border);}
+body.light .ch-hdr-row{
+  background:linear-gradient(90deg,#A8C8D8,#B8D4E0);
+  border-bottom-color:rgba(0,120,150,.3);
+  box-shadow:0 1px 4px rgba(0,80,120,.15);
+}
 body.light .ch-id{color:var(--text2);}
 body.light .fader-lbl{color:var(--chrome);}
 body.light .fader-val{color:var(--accent);text-shadow:none;}
 body.light .fader-track{
-  background:linear-gradient(180deg,#C8C4BC 0%,#D4D0C8 50%,#C8C4BC 100%);
-  border-color:#B8B4AC;
-  border-left-color:#C0BDB4;
-  border-right-color:#C0BDB4;
+  background:linear-gradient(90deg,
+    #606058 0%,
+    #7A7870 8%,
+    #989490 20%,
+    #A8A4A0 50%,
+    #989490 80%,
+    #7A7870 92%,
+    #606058 100%
+  );
+  border-color:#585850;
+  border-left-color:#686860;
+  border-right-color:#686860;
   box-shadow:
-    inset 0 2px 6px rgba(0,0,0,.18),
-    inset 1px 0 3px rgba(0,0,0,.10),
-    inset -1px 0 3px rgba(0,0,0,.10),
-    inset 0 1px 0 rgba(255,255,255,.5),
-    0 0 0 1px rgba(0,100,120,.04);
+    inset 0 6px 14px rgba(0,0,0,.5),
+    inset 3px 0 8px rgba(0,0,0,.3),
+    inset -3px 0 8px rgba(0,0,0,.3),
+    inset 0 2px 0 rgba(0,0,0,.4),
+    0 0 0 1px rgba(0,0,0,.12);
 }
 body.light .fader-fill{
   background:linear-gradient(0deg,
@@ -818,26 +987,26 @@ body.light .ch.t2 .fader-fill,body.light .ch.t4 .fader-fill{
 }
 body.light .fader-thumb{
   background:linear-gradient(180deg,
-    #FAFAF8 0%,
-    #EAE8E4 4%,
-    #C8C4BC 16%,
-    #A8A49C 34%,
-    #8C887E 47%,
-    #888078 50%,
-    #8C887E 53%,
-    #A8A49C 66%,
-    #C8C4BC 84%,
-    #EAE8E4 96%,
-    #FAFAF8 100%
+    #FFFFFF 0%,
+    #F4F2EE 3%,
+    #DEDAD4 12%,
+    #B8B4AC 30%,
+    #989490 44%,
+    #888480 50%,
+    #989490 56%,
+    #B8B4AC 70%,
+    #DEDAD4 88%,
+    #F4F2EE 97%,
+    #FFFFFF 100%
   );
-  border-color:#A0A098;
-  border-top-color:#FEFEFE;
-  border-bottom-color:#888078;
+  border-color:#888480;
+  border-top-color:#FFFFFF;
+  border-bottom-color:#686460;
   box-shadow:
-    0 2px 8px rgba(0,0,0,.28),
-    0 0 0 1px rgba(0,0,0,.10),
-    inset 0 2px 0 rgba(255,255,255,.7),
-    inset 0 -1px 0 rgba(0,0,0,.15);
+    0 4px 14px rgba(0,0,0,.38),
+    0 0 0 1px rgba(0,0,0,.14),
+    inset 0 3px 0 rgba(255,255,255,.85),
+    inset 0 -2px 0 rgba(0,0,0,.18);
 }
 body.light .fader-thumb::before,body.light .fader-thumb::after{
   background:linear-gradient(90deg,transparent,rgba(0,0,0,.18) 25%,rgba(0,0,0,.18) 75%,transparent);
@@ -856,20 +1025,20 @@ body.light .fader-track.value-active .fader-thumb{
   border-top-color:#FFFFFF;
 }
 body.light .knob{
-  background:conic-gradient(#C8C4BC 0deg 225deg,#C8C4BC 225deg 360deg);
+  background:conic-gradient(#9A9890 0deg 225deg,#9A9890 225deg 360deg);
   box-shadow:
-    0 3px 10px rgba(0,0,0,.22),
-    0 0 0 1px rgba(0,0,0,.14),
-    0 0 0 2px rgba(255,255,255,.55),
-    inset 0 1px 0 rgba(255,255,255,.5);
+    0 4px 12px rgba(0,0,0,.30),
+    0 0 0 1px rgba(0,0,0,.20),
+    0 0 0 2px rgba(255,255,255,.6),
+    inset 0 1px 0 rgba(255,255,255,.4);
 }
 body.light .knob-body{
-  background:radial-gradient(circle at 36% 30%,#DEDAD4 0%,#C8C4BE 28%,#B0ACA5 58%,#A8A49C 100%);
-  border-color:rgba(0,0,0,.18);
+  background:radial-gradient(circle at 32% 28%,#F0EDE8 0%,#D8D4CE 22%,#B8B4AC 50%,#A0A098 78%,#909088 100%);
+  border-color:rgba(0,0,0,.25);
   box-shadow:
-    inset 0 3px 7px rgba(255,255,255,.7),
-    inset 0 -3px 9px rgba(0,0,0,.20),
-    inset 0 0 18px rgba(0,0,0,.08);
+    inset 0 4px 8px rgba(255,255,255,.75),
+    inset 0 -4px 10px rgba(0,0,0,.28),
+    inset 0 0 20px rgba(0,0,0,.10);
 }
 body.light .knob-val{text-shadow:none;}
 body.light .knob-lbl{color:var(--chrome);}
@@ -898,7 +1067,18 @@ body.light .preset-input{background:#F0EDE8;border-color:var(--border2);color:va
 body.light .preset-save-btn{border-color:rgba(0,126,120,.4);background:rgba(0,126,120,.06);color:var(--accent);}
 body.light .abort-btn{border-color:rgba(200,40,40,.3);color:rgba(180,40,40,.55);}
 body.light .abort-btn:hover{border-color:#CC2020;color:#CC2020;background:rgba(200,40,40,.07);}
-body.light .hero-tagline{color:#4A3000;text-shadow:0 0 3px rgba(255,220,100,.8),0 0 8px rgba(255,160,20,.5),0 0 16px rgba(255,100,0,.3);}
+body.light .hero-tagline{
+  color:#2A1400;
+  text-shadow:
+    0 0 1px rgba(255,240,80,1),
+    0 0 3px rgba(255,220,40,1),
+    0 0 8px rgba(255,190,0,1),
+    0 0 16px rgba(255,160,0,.85),
+    0 0 30px rgba(255,120,0,.6),
+    0 0 55px rgba(255,80,0,.3),
+    0 0 90px rgba(255,60,0,.15);
+  -webkit-font-smoothing:antialiased;
+}
 body.light .hero-brand{color:rgba(0,100,90,.06);}
 body.light .copy-btn{background:rgba(240,237,232,.9);border-color:var(--border2);}
 body.light .history-item{border-color:var(--border);}
@@ -907,6 +1087,179 @@ body.light .preset-empty{color:var(--text3);}
 body.light .preset-name{color:var(--text);}
 body.light .api-tag{background:rgba(0,126,120,.06);border-color:rgba(0,126,120,.2);color:var(--accent);}
 body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 0 2px 6px rgba(0,0,0,.15),0 0 0 1px rgba(200,130,0,.15);}
+
+/* ── LIGHT THEME — BRIGHT GLOWING TEXT ─────────────────── */
+body.light .hdr-settings-label{
+  color:var(--accent2);
+  text-shadow:0 0 10px rgba(0,158,150,.5),0 0 20px rgba(0,158,150,.25);
+}
+body.light .hdr-settings{
+  font-size:13px;
+  color:#0A2030;
+  text-shadow:0 0 6px rgba(0,120,140,.25);
+  font-weight:800;
+  letter-spacing:.03em;
+}
+body.light .bank-hd{
+  color:#006860;
+  text-shadow:0 0 6px rgba(0,158,150,.35);
+  background:#D8D4CE;
+}
+body.light .ch-id{
+  color:#002838;
+  text-shadow:0 1px 0 rgba(255,255,255,.4);
+  font-weight:900;
+}
+body.light .fader-lbl{
+  font-size:12px;
+  color:#002820;
+  text-shadow:
+    0 0 1px rgba(0,220,200,1),
+    0 0 4px rgba(0,210,190,.95),
+    0 0 10px rgba(0,190,170,.7),
+    0 0 22px rgba(0,170,150,.4),
+    0 0 40px rgba(0,150,130,.18);
+  font-weight:900;
+  letter-spacing:.18em;
+  -webkit-font-smoothing:antialiased;
+}
+body.light .fader-val{
+  font-size:14px;
+  color:#001A14;
+  text-shadow:
+    0 0 1px rgba(0,240,220,1),
+    0 0 4px rgba(0,220,200,1),
+    0 0 10px rgba(0,200,180,.85),
+    0 0 20px rgba(0,180,160,.55),
+    0 0 38px rgba(0,160,140,.25);
+  font-weight:900;
+  letter-spacing:.08em;
+  -webkit-font-smoothing:antialiased;
+}
+body.light .knob-lbl{
+  font-size:10px;
+  color:#002820;
+  text-shadow:
+    0 0 1px rgba(0,220,200,1),
+    0 0 4px rgba(0,210,190,.95),
+    0 0 10px rgba(0,190,170,.7),
+    0 0 22px rgba(0,170,150,.4),
+    0 0 40px rgba(0,150,130,.18);
+  font-weight:900;
+  letter-spacing:.14em;
+  text-align:center;
+  -webkit-font-smoothing:antialiased;
+}
+body.light .knob-val{
+  font-size:13px;
+  color:#001A14;
+  text-shadow:
+    0 0 1px rgba(0,240,220,1),
+    0 0 4px rgba(0,220,200,1),
+    0 0 10px rgba(0,200,180,.85),
+    0 0 20px rgba(0,180,160,.55),
+    0 0 38px rgba(0,160,140,.25);
+  font-weight:900;
+  letter-spacing:.08em;
+  -webkit-font-smoothing:antialiased;
+}
+body.light .section-hd{
+  color:#005058;
+  text-shadow:0 0 8px rgba(0,130,150,.35);
+  font-weight:900;
+  letter-spacing:.2em;
+}
+body.light .meter-val{
+  color:#007E78;
+  text-shadow:0 0 8px rgba(0,158,150,.5);
+  font-weight:800;
+}
+body.light .meter-lvl{
+  color:#006860;
+  text-shadow:0 0 5px rgba(0,140,130,.3);
+  font-weight:800;
+}
+body.light .ch-btn{
+  color:rgba(200,235,245,.85);
+  border-color:rgba(160,210,230,.35);
+  background:rgba(100,180,200,.08);
+  font-weight:800;
+  letter-spacing:.1em;
+  text-shadow:0 0 4px rgba(160,220,240,.3);
+}
+body.light .ch-btn:hover{
+  color:#ffffff;
+  border-color:rgba(0,220,212,.6);
+  text-shadow:0 0 8px rgba(0,220,212,.6);
+  background:rgba(0,180,170,.15);
+}
+body.light .ch-btn.active{
+  color:#001A14;
+  border-color:var(--accent);
+  background:rgba(0,126,120,.14);
+  text-shadow:
+    0 0 1px rgba(0,240,220,1),
+    0 0 5px rgba(0,210,190,.9),
+    0 0 14px rgba(0,190,170,.55),
+    0 0 28px rgba(0,170,150,.25);
+  font-weight:900;
+}
+body.light .ch-btn.mute-btn{
+  color:rgba(255,160,160,.8);
+  border-color:rgba(200,60,60,.35);
+  background:rgba(180,30,30,.08);
+}
+body.light .ch-btn.mute-btn:hover{
+  color:#FF8080;
+  border-color:rgba(220,60,60,.65);
+  background:rgba(180,30,30,.14);
+  text-shadow:0 0 8px rgba(255,80,80,.5);
+}
+body.light .ch-btn.mute-btn.active{
+  color:#FF4444;
+  border-color:rgba(220,40,40,.7);
+  background:rgba(160,20,20,.18);
+  text-shadow:0 0 6px rgba(255,60,60,.9),0 0 16px rgba(220,40,40,.5);
+}
+body.light .pill{
+  color:#1A3A50;
+  border-color:rgba(0,100,120,.2);
+  text-shadow:0 0 4px rgba(0,100,120,.15);
+}
+body.light .pill.active{
+  color:#007E78;
+  text-shadow:0 0 8px rgba(0,158,150,.5);
+}
+body.light .preset-name{
+  color:#1A3A50;
+  text-shadow:0 0 4px rgba(0,80,120,.15);
+  font-weight:600;
+}
+body.light .hc-time{
+  color:#5A7898 !important;
+  text-shadow:0 0 4px rgba(0,80,120,.15);
+}
+body.light .brand{
+  filter:drop-shadow(0 0 8px rgba(0,120,160,.35)) drop-shadow(0 0 18px rgba(0,80,160,.15));
+}
+body.light .reset-btn{
+  color:#007E78;
+  text-shadow:0 0 6px rgba(0,158,150,.4);
+  font-weight:800;
+}
+body.light .launch-btn{
+  color:#007E78;
+  text-shadow:0 0 8px rgba(0,158,150,.5);
+  font-weight:800;
+}
+body.light .abort-btn{
+  text-shadow:0 0 5px rgba(180,30,30,.3);
+}
+body.light .panel-hd{
+  color:#005058;
+  text-shadow:0 0 6px rgba(0,130,150,.3);
+  font-weight:900;
+}
 
 /* ── HERO ───────────────────────────────────────────────── */
 .hero{position:relative;flex-shrink:0;height:108px;overflow:hidden;border-bottom:1px solid var(--border);box-shadow:0 1px 0 rgba(0,200,192,.12);}
@@ -917,6 +1270,37 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 
 /* ── MAIN 3-COLUMN CONSOLE ──────────────────────────────── */
 .console{flex:1;display:flex;overflow:hidden;min-height:0;}
+
+/* ── COMPACT MODE ───────────────────────────────────────── */
+.console.compact .monitor{display:none;}
+.console.compact .channel-bank{width:auto;flex:1;}
+.console.compact .channel-bank.right{border-left:1px solid var(--border);}
+
+/* Collapse tab — sits between left and right bank in compact mode */
+.collapse-tab{
+  width:32px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  background:rgba(0,200,192,.06);
+  border-left:1px solid rgba(0,200,192,.3);
+  border-right:1px solid rgba(0,200,192,.3);
+  transition:all .15s;
+  position:relative;
+}
+.collapse-tab:hover{
+  background:rgba(0,200,192,.16);
+  border-color:rgba(0,220,212,.6);
+}
+.collapse-tab .tab-arrow{
+  font-size:9px;color:var(--accent2);
+  writing-mode:vertical-rl;
+  letter-spacing:.22em;
+  text-shadow:0 0 8px rgba(0,220,212,.8),0 0 18px rgba(0,220,212,.4);
+  user-select:none;
+  font-weight:900;
+}
+.console:not(.compact) .collapse-tab{display:none;}
+.console.compact .collapse-tab{display:flex;}
 
 /* ── CHANNEL STRIP (shared L/R) ─────────────────────────── */
 .channel-bank{
@@ -956,28 +1340,40 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 
 .ch-hdr-row{
   display:flex;align-items:center;justify-content:space-between;
-  width:100%;margin-top:6px;margin-bottom:10px;flex-shrink:0;
+  width:calc(100% + 12px);margin-left:-6px;margin-top:-4px;margin-bottom:10px;
+  padding:5px 8px;flex-shrink:0;
+  background:rgba(0,30,50,.6);
+  border-bottom:1px solid rgba(0,160,180,.15);
 }
 .ch-id{
-  font-size:8px;font-weight:800;letter-spacing:.16em;
+  font-size:9px;font-weight:900;letter-spacing:.16em;
   color:#7A9AB8;text-transform:uppercase;
 }
 .ch-pwr{
   width:18px;height:18px;border-radius:2px;
-  border:1px solid rgba(0,196,192,.2);
-  background:rgba(0,196,192,.06);
-  color:rgba(0,196,192,.55);
+  border:1px solid rgba(0,210,80,.5);
+  background:rgba(0,180,60,.12);
+  color:#00E050;
   font-size:9px;font-weight:900;letter-spacing:0;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .15s;flex-shrink:0;line-height:1;
   padding:0;
+  box-shadow:0 0 6px rgba(0,210,80,.35),inset 0 0 4px rgba(0,210,80,.1);
+  text-shadow:0 0 6px rgba(0,240,100,.9),0 0 12px rgba(0,210,80,.5);
 }
-.ch-pwr:hover{border-color:rgba(0,196,192,.5);color:rgba(0,196,192,.95);background:rgba(0,196,192,.14);}
+.ch-pwr:hover{
+  border-color:rgba(0,230,100,.8);
+  color:#40FF80;
+  background:rgba(0,200,70,.2);
+  box-shadow:0 0 10px rgba(0,220,80,.55),inset 0 0 6px rgba(0,220,80,.15);
+  text-shadow:0 0 8px rgba(0,255,100,1),0 0 18px rgba(0,220,80,.6);
+}
 .ch-pwr.off{
-  border-color:rgba(210,60,60,.3);
-  background:rgba(180,30,30,.1);
-  color:rgba(210,80,80,.6);
-  box-shadow:0 0 5px rgba(200,40,40,.12);
+  border-color:rgba(220,40,40,.6);
+  background:rgba(180,20,20,.14);
+  color:#FF4040;
+  box-shadow:0 0 6px rgba(220,40,40,.4),inset 0 0 4px rgba(200,30,30,.1);
+  text-shadow:0 0 6px rgba(255,60,60,.9),0 0 14px rgba(220,40,40,.5);
 }
 /* ── PICKUP MODE (soft takeover) ────────────────────────── */
 .fader-ghost{
@@ -1171,10 +1567,10 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 /* the hardware thumb cap — cold chrome console fader */
 .fader-thumb{
   position:absolute;
-  width:44px;height:28px;
+  width:48px;height:42px;
   left:50%;transform:translateX(-50%);
   cursor:ns-resize;z-index:3;touch-action:none;
-  border-radius:3px;
+  border-radius:4px;
   background:linear-gradient(180deg,
     #EEF6FF 0%,
     #C8DCEE 4%,
@@ -1288,7 +1684,8 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
   display:flex;flex-direction:column;
   gap:3px;width:100%;flex-shrink:0;
   border-top:1px solid var(--border);
-  padding-top:7px;
+  padding-top:4px;
+  margin-top:auto;
 }
 .ch-btn{
   height:26px;border-radius:3px;
@@ -1505,6 +1902,71 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
   .knob{width:42px;height:42px;}
   .ch-btn{height:30px;}
 }
+
+/* ── COMPARE PANEL ──────────────────────────────────────── */
+.cmp-open-btn{
+  height:36px;padding:0 14px;border-radius:4px;
+  border:1.5px solid rgba(217,70,239,.5);background:rgba(217,70,239,.08);
+  color:var(--magenta2);font-size:10px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap;
+  box-shadow:0 0 10px rgba(217,70,239,.18);text-shadow:0 0 8px rgba(240,171,255,.45);flex-shrink:0;
+}
+.cmp-open-btn:hover{background:rgba(217,70,239,.18);border-color:var(--magenta2);box-shadow:0 0 18px rgba(217,70,239,.35);}
+.cmp-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;}
+.cmp-overlay.open{display:block;}
+.cmp-panel{
+  position:fixed;right:-660px;top:0;bottom:0;width:620px;
+  background:var(--panel);z-index:101;
+  transition:right .26s cubic-bezier(.4,0,.2,1);
+  overflow-y:auto;border-left:2px solid var(--magenta);
+  display:flex;flex-direction:column;box-shadow:-8px 0 40px rgba(0,0,0,.8);
+}
+.cmp-panel.open{right:0;}
+.cmp-hd{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:#040608;}
+.cmp-title{font-family:'Abril Fatface',serif;font-size:20px;color:var(--magenta2);text-shadow:0 0 20px rgba(217,70,239,.4);}
+.cmp-close{width:26px;height:26px;border:1px solid var(--border2);background:transparent;cursor:pointer;font-size:13px;color:var(--text2);border-radius:50%;transition:background .12s;display:flex;align-items:center;justify-content:center;font-weight:700;}
+.cmp-close:hover{background:var(--panel2);color:var(--magenta2);}
+.cmp-body{padding:18px;display:flex;flex-direction:column;gap:12px;flex:1;}
+.cmp-selectors{display:flex;gap:10px;}
+.cmp-sel-group{flex:1;display:flex;flex-direction:column;gap:5px;}
+.cmp-sel-label{font-size:8px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);}
+.cmp-select{height:34px;background:var(--panel2);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:12px;font-family:'Inter',sans-serif;padding:0 10px;outline:none;cursor:pointer;transition:border-color .15s;}
+.cmp-select:focus{border-color:var(--magenta);}
+.cmp-prompt-row{display:flex;gap:8px;}
+.cmp-prompt-input{flex:1;height:36px;background:#040608;border:1px solid var(--border2);border-radius:3px;color:var(--text);font-size:12px;font-family:'Inter',sans-serif;padding:0 12px;outline:none;transition:border-color .15s;}
+.cmp-prompt-input:focus{border-color:var(--magenta);box-shadow:0 0 0 2px rgba(217,70,239,.08);}
+.cmp-prompt-input::placeholder{color:var(--text3);}
+.cmp-run-btn{height:36px;padding:0 18px;background:linear-gradient(180deg,#200830,#140020);color:var(--magenta2);border:1px solid rgba(217,70,239,.5);border-radius:3px;font-family:'Inter',sans-serif;font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:all .12s;white-space:nowrap;box-shadow:0 0 10px rgba(217,70,239,.18);}
+.cmp-run-btn:hover{background:linear-gradient(180deg,#2C0A40,#1E0030);box-shadow:0 0 18px rgba(217,70,239,.32);}
+.cmp-run-btn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;}
+.cmp-status{font-size:9px;font-weight:700;letter-spacing:.1em;text-align:center;color:var(--text3);min-height:16px;}
+.cmp-status.active{color:var(--magenta2);text-shadow:0 0 8px rgba(217,70,239,.5);}
+.cmp-outputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.cmp-out{display:flex;flex-direction:column;gap:4px;}
+.cmp-out-label{font-size:8px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);}
+.cmp-out-box{height:150px;overflow-y:auto;background:#030507;border:1px solid var(--border);border-radius:3px;font-size:10px;line-height:1.6;color:var(--text);padding:8px 10px;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;transition:border-color .2s;}
+.cmp-out-box.a-active{border-color:rgba(0,200,192,.45);}
+.cmp-out-box.b-active{border-color:rgba(217,70,239,.45);}
+.cmp-metrics-section{display:flex;flex-direction:column;gap:6px;}
+.cmp-metrics{display:flex;flex-direction:column;gap:5px;}
+.cmp-metric{background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:7px 10px;}
+.cmp-metric-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.cmp-metric-name{font-size:8px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--chrome2);}
+.cmp-winner-chip{font-size:8px;font-weight:800;letter-spacing:.08em;padding:2px 7px;border-radius:2px;}
+.cmp-winner-a{background:rgba(0,200,192,.14);color:var(--accent);border:1px solid rgba(0,200,192,.28);}
+.cmp-winner-b{background:rgba(217,70,239,.1);color:var(--magenta2);border:1px solid rgba(217,70,239,.22);}
+.cmp-winner-tie{background:rgba(255,255,255,.04);color:var(--text3);border:1px solid var(--border);}
+.cmp-bars{display:flex;flex-direction:column;gap:3px;}
+.cmp-bar-row{display:flex;align-items:center;gap:6px;}
+.cmp-bar-lbl{font-size:7px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);width:70px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cmp-bar-track{flex:1;height:5px;background:var(--fader-bg);border-radius:3px;overflow:hidden;}
+.cmp-bar-fill-a{height:100%;background:linear-gradient(90deg,#005850,var(--accent));border-radius:3px;transition:width .6s ease;}
+.cmp-bar-fill-b{height:100%;background:linear-gradient(90deg,#5010A0,var(--magenta));border-radius:3px;transition:width .6s ease;}
+.cmp-bar-score{font-size:8px;font-weight:700;font-variant-numeric:tabular-nums;width:22px;text-align:right;flex-shrink:0;}
+.cmp-bar-score-a{color:var(--accent);}
+.cmp-bar-score-b{color:var(--magenta2);}
+.cmp-summary{font-size:11px;line-height:1.7;color:var(--text2);background:#040608;border:1px solid var(--border);border-radius:3px;padding:10px 12px;font-style:italic;}
+.cmp-no-presets{font-size:12px;color:var(--text3);text-align:center;padding:28px 0;font-style:italic;}
 </style>
 </head>
 <body>
@@ -1519,7 +1981,9 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
   <div class="hdr-right">
     <span id="user-email" style="display:none"></span>
     <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
+    <button class="theme-btn" id="compact-btn" onclick="toggleCompact()" title="Compact mode (` key)" style="font-size:14px;">⊟</button>
     <button class="reset-btn" onclick="resetDefaults()">Reset</button>
+    <button class="cmp-open-btn" onclick="openCompare()">⊕ COMPARE</button>
     <button class="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
     <button class="faq-btn" onclick="openFaq()">?</button>
   </div>
@@ -1589,7 +2053,7 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 </div>
 
 <!-- ── 3-COLUMN CONSOLE ────────────────────────────────────────── -->
-<div class="console">
+<div class="console" id="console">
 
   <!-- LEFT BANK: T1 + T2 -->
   <div class="channel-bank">
@@ -1812,6 +2276,11 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
 
   </div><!-- /right bank -->
 
+  <!-- Collapse tab: only visible in compact mode -->
+  <div class="collapse-tab" onclick="toggleCompact()" title="Expand (` key)">
+    <span class="tab-arrow">EXPAND</span>
+  </div>
+
 </div><!-- /console -->
 
 <!-- SETTINGS -->
@@ -1980,8 +2449,51 @@ body.light .fader-track.pickup{border-color:rgba(200,130,0,.4);box-shadow:inset 
   </div>
 </div>
 
+<!-- COMPARE PANEL -->
+<div class="cmp-overlay" id="cmp-overlay" onclick="closeCompare()"></div>
+<div class="cmp-panel" id="cmp-panel">
+  <div class="cmp-hd">
+    <span class="cmp-title">compare presets</span>
+    <button class="cmp-close" onclick="closeCompare()">✕</button>
+  </div>
+  <div class="cmp-body">
+    <div id="cmp-no-presets" class="cmp-no-presets" style="display:none">Save at least one preset first, then come back.</div>
+    <div id="cmp-controls">
+      <div class="cmp-selectors">
+        <div class="cmp-sel-group">
+          <div class="cmp-sel-label">Preset A</div>
+          <select class="cmp-select" id="cmp-select-a"></select>
+        </div>
+        <div class="cmp-sel-group">
+          <div class="cmp-sel-label">Preset B</div>
+          <select class="cmp-select" id="cmp-select-b"></select>
+        </div>
+      </div>
+      <div class="cmp-prompt-row" style="margin-top:10px">
+        <input class="cmp-prompt-input" id="cmp-prompt" type="text" placeholder="Enter a prompt to run on both presets…">
+        <button class="cmp-run-btn" id="cmp-run-btn" onclick="runCompare()">RUN</button>
+      </div>
+      <div class="cmp-status" id="cmp-status"></div>
+      <div class="cmp-outputs">
+        <div class="cmp-out">
+          <div class="cmp-out-label" id="cmp-label-a">PRESET A</div>
+          <div class="cmp-out-box" id="cmp-out-a"></div>
+        </div>
+        <div class="cmp-out">
+          <div class="cmp-out-label" id="cmp-label-b">PRESET B</div>
+          <div class="cmp-out-box" id="cmp-out-b"></div>
+        </div>
+      </div>
+      <div class="cmp-metrics-section" id="cmp-metrics-section" style="display:none">
+        <div class="cmp-metrics" id="cmp-metrics"></div>
+        <div class="cmp-summary" id="cmp-summary"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-const THUMB_H = 28;
+const THUMB_H = 42;
 const FADERS = {
   intensity: {fill:'ff-intensity', thumb:'fth-intensity', val:'fv-intensity', track:'ft-intensity'},
   certainty: {fill:'ff-certainty', thumb:'fth-certainty', val:'fv-certainty', track:'ft-certainty'},
@@ -2000,6 +2512,10 @@ const BADGE_C  = {EXPLORE:'#00A8A0', FIX:'#8B5CF6', BUILD:'#00C8C0'};
 const PILL_C   = ['#00C8C0','#8B5CF6','#00A0A8','#6040C8'];
 
 let isDragging  = false;
+// Safety net: if a pointer is released anywhere (including outside the element),
+// reset isDragging so SSE updates are never permanently blocked.
+document.addEventListener('pointerup',     () => { isDragging = false; }, true);
+document.addEventListener('pointercancel', () => { isDragging = false; }, true);
 const activeTimers = {};
 const prevVals  = {};  // tracks last seen value per field to detect real changes
 
@@ -2135,7 +2651,9 @@ function setKnob(field, v) {
   if (knobEl) {
     // Live conic arc: sweep from 225° to current position
     const s = 225, e = s + v * 270;
-    const dark = '#0A1620', lit = 'var(--accent)';
+    const isLight = document.body.classList.contains('light');
+    const dark = isLight ? '#9A9890' : '#0A1620';
+    const lit  = isLight ? '#007E78' : 'var(--accent)';
     knobEl.style.background = e <= 360
       ? `conic-gradient(${dark} 0deg ${s}deg,${lit} ${s}deg ${e}deg,${dark} ${e}deg 360deg)`
       : `conic-gradient(${lit} 0deg ${e-360}deg,${dark} ${e-360}deg ${s}deg,${lit} ${s}deg 360deg)`;
@@ -2219,17 +2737,29 @@ async function set(field, value) {
   await fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[field]:value})});
 }
 function toggleBtn(field, val) {
-  set(field, lastState[field] === val ? '' : val);
+  const newVal = lastState[field] === val ? '' : val;
+  lastState[field] = newVal;
+  setButtons(field, newVal);
+  set(field, newVal);
 }
 function toggleTrack(t) {
   const key = t + '_on';
-  set(key, lastState[key] === false ? true : false);
+  const newVal = lastState[key] === false ? true : false;
+  lastState[key] = newVal;
+  const on = newVal !== false;
+  const ch = document.querySelector('.ch.' + t);
+  if (ch) ch.classList.toggle('ch-off', !on);
+  const pwr = document.getElementById('cpwr-' + t);
+  if (pwr) pwr.classList.toggle('off', !on);
+  const mbtn = document.getElementById('mbtn-' + t);
+  if (mbtn) mbtn.classList.toggle('active', !on);
+  set(key, newVal);
 }
 
 const _tok = localStorage.getItem('sb-access-token') || '';
 const es = new EventSource('/stream' + (_tok ? '?token=' + encodeURIComponent(_tok) : ''));
-es.onmessage = e => { if (!isDragging) applyState(JSON.parse(e.data)); };
-es.onerror   = () => { document.getElementById('hdr-vals').textContent = 'reconnecting…'; };
+es.onmessage = e => { applyState(JSON.parse(e.data)); };
+es.onerror   = () => {};
 
 function bindDrag(el, getV, onMove, onDrop) {
   el.addEventListener('pointerdown', e => {
@@ -2757,7 +3287,7 @@ function openSettings() {
 }
 function closeSettings() { document.getElementById('settings-overlay').classList.remove('open'); document.getElementById('settings-panel').classList.remove('open'); }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeFaq(); return; }
+  if (e.key === 'Escape') { closeFaq(); closeCompare(); return; }
   // Suppress shortcuts when typing in an input
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -2772,8 +3302,119 @@ document.addEventListener('keydown', e => {
     case '4': e.preventDefault(); toggleTrack('t4'); break;
     case 'r': case 'R': resetDefaults(); break;
     case 't': case 'T': toggleTheme(); break;
+    case '`': toggleCompact(); break;
     case '?': openFaq(); break;
   }
+});
+
+// ── COMPARE PANEL ─────────────────────────────────────────────────
+function openCompare() {
+  populateCompareSelects();
+  document.getElementById('cmp-overlay').classList.add('open');
+  document.getElementById('cmp-panel').classList.add('open');
+}
+function closeCompare() {
+  document.getElementById('cmp-overlay').classList.remove('open');
+  document.getElementById('cmp-panel').classList.remove('open');
+}
+function populateCompareSelects() {
+  const selA  = document.getElementById('cmp-select-a');
+  const selB  = document.getElementById('cmp-select-b');
+  const noMsg = document.getElementById('cmp-no-presets');
+  const ctrl  = document.getElementById('cmp-controls');
+  if (!presets.length) {
+    noMsg.style.display = ''; ctrl.style.display = 'none'; return;
+  }
+  noMsg.style.display = 'none'; ctrl.style.display = '';
+  const cur  = '<option value="__current__">Current Settings</option>';
+  const opts = presets.map(p => '<option value="' + esc(p.name) + '">' + esc(p.name) + '</option>').join('');
+  selA.innerHTML = cur + opts;
+  selB.innerHTML = cur + opts;
+  if (presets.length >= 1) selB.selectedIndex = 1;
+}
+async function runCompare() {
+  const presetA = document.getElementById('cmp-select-a').value;
+  const presetB = document.getElementById('cmp-select-b').value;
+  const prompt  = document.getElementById('cmp-prompt').value.trim();
+  if (!prompt) { setCompareStatus('Enter a prompt first.'); return; }
+  const runBtn = document.getElementById('cmp-run-btn');
+  runBtn.disabled = true;
+  document.getElementById('cmp-out-a').textContent = '';
+  document.getElementById('cmp-out-b').textContent = '';
+  document.getElementById('cmp-metrics-section').style.display = 'none';
+  const nameA = presetA === '__current__' ? 'Current' : presetA;
+  const nameB = presetB === '__current__' ? 'Current' : presetB;
+  document.getElementById('cmp-label-a').textContent = nameA.toUpperCase();
+  document.getElementById('cmp-label-b').textContent = nameB.toUpperCase();
+  const outA = document.getElementById('cmp-out-a');
+  const outB = document.getElementById('cmp-out-b');
+  setCompareStatus('Initializing…', true);
+  try {
+    const res = await fetch('/compare', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({preset_a: presetA, preset_b: presetB, prompt})
+    });
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+    while (true) {
+      const {done, value} = await reader.read(); if (done) break;
+      buf += dec.decode(value, {stream: true});
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const d = JSON.parse(line.slice(6));
+        if (d.phase === 'a_start') { setCompareStatus('● Running ' + nameA + '…', true); outA.classList.add('a-active'); }
+        if (d.phase === 'a' && d.text) { outA.textContent += d.text; outA.scrollTop = outA.scrollHeight; }
+        if (d.phase === 'a_done') { outA.classList.remove('a-active'); setCompareStatus('● Running ' + nameB + '…', true); outB.classList.add('b-active'); }
+        if (d.phase === 'b' && d.text) { outB.textContent += d.text; outB.scrollTop = outB.scrollHeight; }
+        if (d.phase === 'b_done') { outB.classList.remove('b-active'); setCompareStatus('● Scoring outputs…', true); }
+        if (d.phase === 'scores') { renderCompareScores(d.scores, nameA, nameB); setCompareStatus(''); }
+        if (d.phase === 'score_error') { setCompareStatus('Scoring failed: ' + (d.error || 'unknown')); }
+        if (d.error) { setCompareStatus('Error: ' + d.error); runBtn.disabled = false; }
+        if (d.phase === 'done') { runBtn.disabled = false; }
+      }
+    }
+  } catch(e) { setCompareStatus('Error: ' + e.message); runBtn.disabled = false; }
+}
+function setCompareStatus(msg, active) {
+  const el = document.getElementById('cmp-status');
+  el.textContent = msg; el.classList.toggle('active', !!active);
+}
+function renderCompareScores(scores, nameA, nameB) {
+  const METRICS = [
+    {key:'adherence',  label:'Adherence'},
+    {key:'depth',      label:'Depth'},
+    {key:'clarity',    label:'Clarity'},
+    {key:'efficiency', label:'Efficiency'},
+    {key:'confidence', label:'Confidence'},
+  ];
+  document.getElementById('cmp-metrics').innerHTML = METRICS.map(function(m) {
+    const s  = scores[m.key] || {a:0, b:0, winner:'tie'};
+    const wc = s.winner==='a' ? 'cmp-winner-a' : s.winner==='b' ? 'cmp-winner-b' : 'cmp-winner-tie';
+    const wl = s.winner==='a' ? esc(nameA) : s.winner==='b' ? esc(nameB) : 'TIE';
+    return '<div class="cmp-metric">' +
+      '<div class="cmp-metric-hd">' +
+        '<span class="cmp-metric-name">' + m.label + '</span>' +
+        '<span class="cmp-winner-chip ' + wc + '">' + wl + '</span>' +
+      '</div>' +
+      '<div class="cmp-bars">' +
+        '<div class="cmp-bar-row">' +
+          '<span class="cmp-bar-lbl">' + esc(nameA) + '</span>' +
+          '<div class="cmp-bar-track"><div class="cmp-bar-fill-a" style="width:' + s.a + '%"></div></div>' +
+          '<span class="cmp-bar-score cmp-bar-score-a">' + s.a + '</span>' +
+        '</div>' +
+        '<div class="cmp-bar-row">' +
+          '<span class="cmp-bar-lbl">' + esc(nameB) + '</span>' +
+          '<div class="cmp-bar-track"><div class="cmp-bar-fill-b" style="width:' + s.b + '%"></div></div>' +
+          '<span class="cmp-bar-score cmp-bar-score-b">' + s.b + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('cmp-summary').textContent = scores.summary || '';
+  document.getElementById('cmp-metrics-section').style.display = '';
+}
+document.getElementById('cmp-prompt').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') runCompare();
 });
 
 // ── Auth ──────────────────────────────────────────────────
@@ -2824,6 +3465,26 @@ window.fetch = function(url, opts) {
 function toggleTheme() {
   const isLight = document.body.classList.toggle('light');
   localStorage.setItem('gain_theme', isLight ? 'light' : 'dark');
+}
+
+// ── Compact mode ──────────────────────────────────────────
+(function initCompact() {
+  if (localStorage.getItem('gain_compact') === '1') {
+    document.getElementById('console').classList.add('compact');
+    const btn = document.getElementById('compact-btn');
+    if (btn) btn.textContent = '⊞';
+    const hero = document.querySelector('.hero');
+    if (hero) hero.style.display = 'none';
+  }
+})();
+function toggleCompact() {
+  const c = document.getElementById('console');
+  const compact = c.classList.toggle('compact');
+  const btn = document.getElementById('compact-btn');
+  if (btn) btn.textContent = compact ? '⊞' : '⊟';
+  const hero = document.querySelector('.hero');
+  if (hero) hero.style.display = compact ? 'none' : '';
+  localStorage.setItem('gain_compact', compact ? '1' : '0');
 }
 </script>
 
