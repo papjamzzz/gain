@@ -2,10 +2,20 @@
 """Gain — physical control layer for Claude Code."""
 
 import sys
+import os
 import json
 import shutil
 import subprocess
 from pathlib import Path
+
+# Load .env from gain project directory so ANTHROPIC_API_KEY is always available
+_env_file = Path(__file__).resolve().parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ[_k.strip()] = _v.strip()
 
 STATE_FILE     = Path.home() / ".streamfader" / "state.json"
 PID_FILE       = Path.home() / ".streamfader" / "ctrl.pid"
@@ -208,8 +218,6 @@ def build_system_prompt(state: dict) -> str:
         elif voice == "STUDIO":
             rules.append("VOICE: STUDIO — professional, measured, clean response with minimal framing.")
 
-    state_block = json.dumps({k: v for k, v in state.items() if not k.endswith("_on")})
-
     return "\n".join([
         *rules,
         "",
@@ -218,16 +226,6 @@ def build_system_prompt(state: dict) -> str:
         "- No multi-step planning chains.",
         "- No combined modes.",
         "- Stop immediately after completing the task.",
-        "",
-        "OUTPUT FORMAT:",
-        "STATE:",
-        state_block,
-        "",
-        "ACTION:",
-        "<what you will do — one line>",
-        "",
-        "RESULT:",
-        "<final output>",
     ])
 
 
@@ -264,7 +262,7 @@ def cmd_run(task: str) -> None:
     except Exception:
         pass
     try:
-        proc = subprocess.Popen(cmd, start_new_session=True)
+        proc = subprocess.Popen(cmd)
         try:
             PID_FILE.write_text(str(proc.pid))
         except Exception:

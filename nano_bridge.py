@@ -25,8 +25,9 @@ PID_FILE       = Path.home() / ".streamfader" / "ctrl.pid"
 LAST_TASK_FILE = Path.home() / ".streamfader" / "last_task.txt"
 
 # nanoKONTROL2 transport CC numbers (Scene 1 defaults)
-CC_PLAY = 41
-CC_STOP = 42
+CC_PLAY   = 41
+CC_STOP   = 42
+CC_RECORD = 45
 
 # ── Profiles ──────────────────────────────────────────────────────────────────
 
@@ -275,10 +276,15 @@ def run_bridge(cfg: dict) -> None:
                 port.send(mido.Message("control_change", channel=0,
                                        control=ctrl, value=127 if is_muted else 0))
 
+        def light_stop_led(port):
+            if port:
+                port.send(mido.Message("control_change", channel=0, control=CC_STOP, value=127))
+
         # Sync LEDs to current state on startup
         if out_port:
             send_leds(out_port, state, led_map)
             sync_mute_leds(out_port, state)
+            light_stop_led(out_port)  # STOP LED always on
 
         try:
             for msg in port:
@@ -336,22 +342,40 @@ def run_bridge(cfg: dict) -> None:
                         changed = True
 
                     # ── TRANSPORT ────────────────────────────────────────
-                    # STOP — kill current ctrl run
-                    elif msg.control == CC_STOP and msg.value > 0:
-                        killed = kill_running()
-                        event  = "■ STOP — killed" if killed else "■ STOP — idle"
+                    # PLAY — Enter key in Terminal (submit current Claude Code prompt)
+                    elif msg.control == CC_PLAY and msg.value > 0:
+                        subprocess.Popen([
+                            "osascript", "-e",
+                            'tell application "Terminal" to activate',
+                            "-e",
+                            'tell application "System Events" to key code 36'
+                        ])
+                        event = "▶ PLAY — Enter sent"
                         render_state(state, event)
 
-                    # PLAY — re-run last task with current state
-                    elif msg.control == CC_PLAY and msg.value > 0:
-                        task = read_last_task()
-                        if task:
-                            kill_running()          # stop anything already running
-                            launch_run(task)
-                            lbl = (task[:28] + "…") if len(task) > 28 else task
-                            event = f"▶ {lbl}"
-                        else:
-                            event = "▶ PLAY — no task queued"
+                    # STOP — SIGINT directly to claude process (works mid-response)
+                    elif msg.control == CC_STOP and msg.value > 0:
+                        kill_running()  # kill any ctrl run in flight
+                        # Send SIGINT to the claude binary itself — no UI needed
+                        subprocess.run(
+                            ["pkill", "-INT", "-f", "/opt/homebrew/bin/claude"],
+                            capture_output=True
+                        )
+                        event = "■ STOP — SIGINT sent"
+                        render_state(state, event)
+                        light_stop_led(out_port)
+
+                    # RECORD — /clear in Claude Code (wipe conversation context)
+                    elif msg.control == CC_RECORD and msg.value > 0:
+                        subprocess.Popen([
+                            "osascript", "-e",
+                            'tell application "Terminal" to activate',
+                            "-e",
+                            'tell application "System Events" to keystroke "/clear"',
+                            "-e",
+                            'tell application "System Events" to key code 36'
+                        ])
+                        event = "⏺ RECORD — /clear sent"
                         render_state(state, event)
 
 
