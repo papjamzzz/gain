@@ -514,6 +514,7 @@ def compare_presets():
         # ── Run A ──────────────────────────────────────────────
         yield f"data: {json.dumps({'phase': 'a_start'})}\n\n"
         output_a = ""
+        tokens_a  = 0
         try:
             with client.messages.stream(
                 model=MODEL, max_tokens=2048,
@@ -523,13 +524,19 @@ def compare_presets():
                 for text in s.text_stream:
                     output_a += text
                     yield f"data: {json.dumps({'phase': 'a', 'text': text})}\n\n"
+                try:
+                    tokens_a = s.get_final_message().usage.output_tokens
+                except Exception:
+                    pass
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"; return
-        yield f"data: {json.dumps({'phase': 'a_done'})}\n\n"
+        words_a = len(output_a.split())
+        yield f"data: {json.dumps({'phase': 'a_done', 'tokens': tokens_a, 'words': words_a})}\n\n"
 
         # ── Run B ──────────────────────────────────────────────
         yield f"data: {json.dumps({'phase': 'b_start'})}\n\n"
         output_b = ""
+        tokens_b  = 0
         try:
             with client.messages.stream(
                 model=MODEL, max_tokens=2048,
@@ -539,9 +546,14 @@ def compare_presets():
                 for text in s.text_stream:
                     output_b += text
                     yield f"data: {json.dumps({'phase': 'b', 'text': text})}\n\n"
+                try:
+                    tokens_b = s.get_final_message().usage.output_tokens
+                except Exception:
+                    pass
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"; return
-        yield f"data: {json.dumps({'phase': 'b_done'})}\n\n"
+        words_b = len(output_b.split())
+        yield f"data: {json.dumps({'phase': 'b_done', 'tokens': tokens_b, 'words': words_b})}\n\n"
 
         # ── Score ──────────────────────────────────────────────
         yield f"data: {json.dumps({'phase': 'scoring'})}\n\n"
@@ -552,18 +564,22 @@ def compare_presets():
                 f"PROMPT: {prompt}\n\n"
                 f"OUTPUT A (Preset: {preset_a}):\n{output_a}\n\n"
                 f"OUTPUT B (Preset: {preset_b}):\n{output_b}\n\n"
-                "Score each output on these 5 metrics (0-100):\n"
+                f"USAGE: Output A used {tokens_a} tokens ({words_a} words). "
+                f"Output B used {tokens_b} tokens ({words_b} words).\n\n"
+                "Score each output on these 6 metrics (0-100):\n"
                 "1. ADHERENCE — Did it follow the request precisely?\n"
                 "2. DEPTH — How thoroughly did it address the topic?\n"
                 "3. CLARITY — How clear and well-structured is the output?\n"
                 "4. EFFICIENCY — Did it say what needed saying without waste?\n"
-                "5. CONFIDENCE — How decisive and assured is the output tone?\n\n"
+                "5. CONFIDENCE — How decisive and assured is the output tone?\n"
+                "6. TOKEN_EFFICIENCY — Considering the token counts above, which delivered more value per token spent? Score higher for more signal per token.\n\n"
                 "Return ONLY valid JSON with no text before or after:\n"
                 '{"adherence":{"a":0,"b":0,"winner":"a"},'
                 '"depth":{"a":0,"b":0,"winner":"a"},'
                 '"clarity":{"a":0,"b":0,"winner":"a"},'
                 '"efficiency":{"a":0,"b":0,"winner":"a"},'
                 '"confidence":{"a":0,"b":0,"winner":"a"},'
+                '"token_efficiency":{"a":0,"b":0,"winner":"a"},'
                 '"overall_winner":"a","summary":"2-3 sentences on the key behavioral differences"}'
             )
             resp = client.messages.create(
@@ -1947,7 +1963,7 @@ body.light .panel-hd{
 .cmp-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;}
 .cmp-overlay.open{display:block;}
 .cmp-panel{
-  position:fixed;right:-660px;top:0;bottom:0;width:620px;
+  position:fixed;right:-820px;top:0;bottom:0;width:780px;
   background:var(--panel);z-index:101;
   transition:right .26s cubic-bezier(.4,0,.2,1);
   overflow-y:auto;border-left:2px solid var(--magenta);
@@ -1976,7 +1992,16 @@ body.light .panel-hd{
 .cmp-outputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .cmp-out{display:flex;flex-direction:column;gap:4px;}
 .cmp-out-label{font-size:8px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);}
-.cmp-out-box{height:180px;overflow-y:auto;background:#030507;border:1px solid var(--border);border-radius:3px;font-size:14px;line-height:1.85;color:#FFFFFF;font-weight:500;padding:12px 14px;font-family:'Inter',sans-serif;white-space:pre-wrap;transition:border-color .2s;}
+.cmp-out-box{height:260px;overflow-y:auto;background:#030507;border:1px solid var(--border);border-radius:3px;font-size:14px;line-height:1.85;color:#FFFFFF;font-weight:500;padding:12px 14px;font-family:'Inter',sans-serif;white-space:pre-wrap;transition:border-color .2s;}
+.cmp-scorecard-hd{font-size:9px;font-weight:900;letter-spacing:.24em;text-transform:uppercase;color:var(--magenta2);text-shadow:0 0 8px rgba(217,70,239,.4);margin-bottom:8px;padding-top:4px;}
+.cmp-raw-strip{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.cmp-raw-card{background:#030507;border:1px solid var(--border);border-radius:3px;padding:10px 12px;}
+.cmp-raw-lbl{font-size:8px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.cmp-raw-vals{display:flex;gap:16px;align-items:flex-end;}
+.cmp-raw-num-a{font-size:22px;font-weight:900;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1;}
+.cmp-raw-num-b{font-size:22px;font-weight:900;color:var(--magenta2);font-variant-numeric:tabular-nums;line-height:1;}
+.cmp-raw-sub{font-size:9px;color:var(--text3);font-weight:600;letter-spacing:.06em;margin-top:2px;}
+.cmp-raw-note{font-size:10px;color:var(--text2);margin-top:6px;font-weight:600;}
 .cmp-out-box.a-active{border-color:rgba(0,200,192,.45);}
 .cmp-out-box.b-active{border-color:rgba(217,70,239,.45);}
 .cmp-metrics-section{display:flex;flex-direction:column;gap:6px;}
@@ -2546,8 +2571,10 @@ body.light .panel-hd{
         </div>
       </div>
       <div class="cmp-metrics-section" id="cmp-metrics-section" style="display:none">
+        <div class="cmp-scorecard-hd">SCORECARD</div>
         <div class="cmp-metrics" id="cmp-metrics"></div>
         <div class="cmp-summary" id="cmp-summary"></div>
+        <div class="cmp-raw-strip" id="cmp-raw-strip"></div>
       </div>
     </div>
   </div>
@@ -3350,6 +3377,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ── COMPARE PANEL ─────────────────────────────────────────────────
+let cmpTokensA = 0, cmpTokensB = 0, cmpWordsA = 0, cmpWordsB = 0;
 function openCompare() {
   populateCompareSelects();
   document.getElementById('cmp-overlay').classList.add('open');
@@ -3406,9 +3434,9 @@ async function runCompare() {
         const d = JSON.parse(line.slice(6));
         if (d.phase === 'a_start') { setCompareStatus('● Running ' + nameA + '…', true); outA.classList.add('a-active'); }
         if (d.phase === 'a' && d.text) { outA.textContent += d.text; outA.scrollTop = outA.scrollHeight; }
-        if (d.phase === 'a_done') { outA.classList.remove('a-active'); setCompareStatus('● Running ' + nameB + '…', true); outB.classList.add('b-active'); }
+        if (d.phase === 'a_done') { cmpTokensA = d.tokens||0; cmpWordsA = d.words||0; outA.classList.remove('a-active'); setCompareStatus('● Running ' + nameB + '…', true); outB.classList.add('b-active'); }
         if (d.phase === 'b' && d.text) { outB.textContent += d.text; outB.scrollTop = outB.scrollHeight; }
-        if (d.phase === 'b_done') { outB.classList.remove('b-active'); setCompareStatus('● Scoring outputs…', true); }
+        if (d.phase === 'b_done') { cmpTokensB = d.tokens||0; cmpWordsB = d.words||0; outB.classList.remove('b-active'); setCompareStatus('● Scoring outputs…', true); }
         if (d.phase === 'scores') { renderCompareScores(d.scores, nameA, nameB); setCompareStatus(''); }
         if (d.phase === 'score_error') { setCompareStatus('Scoring failed: ' + (d.error || 'unknown')); }
         if (d.error) { setCompareStatus('Error: ' + d.error); runBtn.disabled = false; }
@@ -3423,11 +3451,12 @@ function setCompareStatus(msg, active) {
 }
 function renderCompareScores(scores, nameA, nameB) {
   const METRICS = [
-    {key:'adherence',  label:'Adherence'},
-    {key:'depth',      label:'Depth'},
-    {key:'clarity',    label:'Clarity'},
-    {key:'efficiency', label:'Efficiency'},
-    {key:'confidence', label:'Confidence'},
+    {key:'adherence',       label:'Adherence'},
+    {key:'depth',           label:'Depth'},
+    {key:'clarity',         label:'Clarity'},
+    {key:'efficiency',      label:'Efficiency'},
+    {key:'confidence',      label:'Confidence'},
+    {key:'token_efficiency',label:'Token Efficiency'},
   ];
   document.getElementById('cmp-metrics').innerHTML = METRICS.map(function(m) {
     const s  = scores[m.key] || {a:0, b:0, winner:'tie'};
@@ -3453,6 +3482,33 @@ function renderCompareScores(scores, nameA, nameB) {
     '</div>';
   }).join('');
   document.getElementById('cmp-summary').textContent = scores.summary || '';
+
+  // Raw stats strip
+  const rawEl = document.getElementById('cmp-raw-strip');
+  if (rawEl) {
+    const wRatio = cmpWordsA && cmpWordsB ? Math.max(cmpWordsA,cmpWordsB)/Math.max(1,Math.min(cmpWordsA,cmpWordsB)) : 0;
+    const wLonger = cmpWordsA > cmpWordsB ? esc(nameA) : esc(nameB);
+    const tDiff = Math.abs(cmpTokensA - cmpTokensB);
+    const tCheaper = cmpTokensA < cmpTokensB ? esc(nameA) : esc(nameB);
+    rawEl.innerHTML =
+      '<div class="cmp-raw-card">' +
+        '<div class="cmp-raw-lbl">Reply Length</div>' +
+        '<div class="cmp-raw-vals">' +
+          '<div><div class="cmp-raw-num-a">' + (cmpWordsA||'—') + '</div><div class="cmp-raw-sub">' + esc(nameA) + ' words</div></div>' +
+          '<div><div class="cmp-raw-num-b">' + (cmpWordsB||'—') + '</div><div class="cmp-raw-sub">' + esc(nameB) + ' words</div></div>' +
+        '</div>' +
+        (wRatio ? '<div class="cmp-raw-note">' + wLonger + ' is ' + wRatio.toFixed(1) + '× longer</div>' : '') +
+      '</div>' +
+      '<div class="cmp-raw-card">' +
+        '<div class="cmp-raw-lbl">Tokens Used</div>' +
+        '<div class="cmp-raw-vals">' +
+          '<div><div class="cmp-raw-num-a">' + (cmpTokensA||'—') + '</div><div class="cmp-raw-sub">' + esc(nameA) + '</div></div>' +
+          '<div><div class="cmp-raw-num-b">' + (cmpTokensB||'—') + '</div><div class="cmp-raw-sub">' + esc(nameB) + '</div></div>' +
+        '</div>' +
+        (tDiff ? '<div class="cmp-raw-note">' + tCheaper + ' used ' + tDiff.toLocaleString() + ' fewer tokens</div>' : '') +
+      '</div>';
+  }
+
   document.getElementById('cmp-metrics-section').style.display = '';
 }
 document.getElementById('cmp-prompt').addEventListener('keydown', function(e) {
