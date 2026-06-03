@@ -133,9 +133,9 @@ def _execute_tool(name: str, inputs: dict) -> str:
 
 DEFAULT_STATE = {
     "mode": "BUILD", "intensity": 0.5, "depth": 0.5,
-    "certainty": 0.5, "risk": 0.5, "stance": "GUIDE",
-    "scope": 0.5, "bandwidth": 0.5, "filter": "MODULE",
-    "room": 0.5, "decay": 0.5, "voice": "STUDIO",
+    "certainty": 0.5, "risk": 0.5, "stance": "",
+    "scope": 0.5, "bandwidth": 0.5, "filter": "",
+    "room": 0.5, "decay": 0.5, "voice": "",
     "t1_on": True, "t2_on": True, "t3_on": True, "t4_on": True,
 }
 
@@ -1288,8 +1288,8 @@ body.light .panel-hd{
 .console.compact .knob{width:80px;height:80px;}
 .console.compact .knob-body{inset:8px;}
 .console.compact .knob-dot{width:4px;height:19px;top:9px;transform-origin:50% 31px;}
-.console.compact .knob-lbl{font-size:15px;letter-spacing:.1em;font-weight:800;}
-.console.compact .knob-val{font-size:15px;font-weight:900;}
+.console.compact .knob-lbl{font-size:17px;letter-spacing:.05em;font-weight:800;}
+.console.compact .knob-val{font-size:16px;font-weight:900;}
 
 /* Buttons — kill the floating dead space, section border above */
 .console.compact .ch-btns{margin-top:0;gap:6px;padding-top:10px;border-top:2px solid rgba(0,200,192,.1);}
@@ -2848,11 +2848,11 @@ Object.entries(FADERS).forEach(([field, ids]) => {
       const dy  = ev.clientY - prevY;
       const r   = getRange(ids.track);
       const fine = ev.shiftKey ? FINE_MULT : 1;
-      const raw  = dy / r * fine;
+      const raw  = -dy / r * fine;
       // Exponential ease-out: precise when slow, accelerates when fast
       const sign   = raw < 0 ? -1 : 1;
       const curved = sign * Math.pow(Math.abs(raw), 0.78);
-      vel = vel * FADER_INERTIA + (dy / r * fine) * (16 / dt) * (1 - FADER_INERTIA);
+      vel = vel * FADER_INERTIA + (-dy / r * fine) * (16 / dt) * (1 - FADER_INERTIA);
       setFader(field, Math.max(0, Math.min(1, getV() + curved)));
       prevY = ev.clientY; prevT = now;
     }
