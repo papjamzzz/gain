@@ -4517,6 +4517,8 @@ function logout() {
 
 (async function initAuth() {
   if (!SB_URL) return; // local dev, no auth
+  const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+  if (isLocal) return; // bypass auth on local
   const token = getToken();
   if (!token) { window.location.href = '/login'; return; }
   try {
