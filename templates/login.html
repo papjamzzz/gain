@@ -300,13 +300,12 @@
         const data = await res.json();
         if (data.error || data.error_description || data.msg) {
           setStatus(data.error_description || data.msg || data.error, 'err');
-        } else if (isSignUp) {
-          setStatus('Check your email to confirm your account.', 'ok');
         } else if (data.access_token) {
-          // Store token and go to app
           localStorage.setItem('sb-access-token', data.access_token);
-          localStorage.setItem('sb-refresh-token', data.refresh_token);
+          localStorage.setItem('sb-refresh-token', data.refresh_token || '');
           window.location.href = '/app';
+        } else {
+          setStatus('Check your email to confirm your account.', 'ok');
         }
       } catch(e) {
         setStatus('Network error. Try again.', 'err');
