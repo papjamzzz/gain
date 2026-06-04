@@ -373,13 +373,13 @@ def auth_callback():
 
 @app.route("/app")
 def app_view():
-    return HTML_LEGACY
+    return HTML
 
 @app.route("/")
 def index():
     if SUPABASE_URL:
         return redirect("/login")
-    return HTML_LEGACY
+    return HTML
 
 @app.route("/stream")
 def stream():
@@ -1685,7 +1685,7 @@ async function abortTask(){
   try{await fetch('/abort',{method:'POST'});}catch(e){}
 }
 function toggleCompact(){
-  window.location.href='/app';
+  window.location.href='/proto';
 }
 loadPresets();
 (function(){if(localStorage.getItem('gain_theme')==='light')document.body.classList.add('light');})();
@@ -4564,7 +4564,7 @@ function toggleTheme() {
   }
 })();
 function toggleCompact() {
-  window.location.href = '/proto';
+  window.location.href = '/app';
 }
 </script>
 
