@@ -373,13 +373,13 @@ def auth_callback():
 
 @app.route("/app")
 def app_view():
-    return HTML
+    return HTML_LEGACY
 
 @app.route("/")
 def index():
     if SUPABASE_URL:
         return redirect("/login")
-    return HTML
+    return HTML_LEGACY
 
 @app.route("/stream")
 def stream():
@@ -854,7 +854,7 @@ def stripe_webhook():
 
 @app.route("/proto")
 def proto_view():
-    return HTML_LEGACY
+    return HTML
 
 
 @app.route("/health")
@@ -996,7 +996,10 @@ HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <title>Gain</title>
-<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#060A0F;font-family:'Inter',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;color:#D8EAF8;user-select:none;}
@@ -1097,11 +1100,12 @@ body.light .hdr-action.cmp-trigger{border-color:rgba(176,32,200,.35);color:rgba(
 .bb-btn:hover{background:rgba(0,200,192,.16);border-color:#00DDD4;}
 .bb-btn:disabled{opacity:.35;cursor:not-allowed;}
 .preset-chips{display:flex;flex-wrap:wrap;gap:4px;min-height:18px;}
-.preset-chip{display:flex;align-items:center;gap:3px;background:#0A141E;border:1px solid #1E2E40;border-radius:2px;padding:2px 4px 2px 7px;cursor:default;transition:border-color .1s;}
-.preset-chip:hover{border-color:rgba(0,200,192,.45);}
-.preset-chip-name{font-size:10px;font-weight:700;color:#90B4C8;letter-spacing:.04em;cursor:pointer;}
-.preset-chip-del{background:none;border:none;color:rgba(140,170,190,.35);font-size:10px;cursor:pointer;padding:0 1px;line-height:1;font-weight:900;}
-.preset-chip-del:hover{color:#FF6060;}
+.preset-chip{display:flex;align-items:center;gap:4px;background:#0A141E;border:1px solid #1E2E40;border-radius:3px;padding:3px 5px 3px 9px;cursor:default;transition:border-color .1s;}
+.preset-chip:hover{border-color:rgba(0,200,192,.55);}
+.preset-chip-name{font-size:11px;font-weight:700;color:#A8CCDE;letter-spacing:.04em;cursor:pointer;}
+.preset-chip-name:hover{color:#00DDD4;}
+.preset-chip-del{background:none;border:none;color:rgba(180,80,80,.7);font-size:12px;cursor:pointer;padding:0 2px;line-height:1;font-weight:900;transition:color .1s;}
+.preset-chip-del:hover{color:#FF5050;}
 .preset-empty{font-size:10px;color:rgba(80,120,145,.4);font-style:italic;}
 .run-status{font-size:9px;font-weight:700;letter-spacing:.1em;color:rgba(0,200,192,.5);min-height:13px;}
 .resp-box{background:#040810;border:1px solid #162030;border-radius:3px;padding:9px 11px;font-size:11px;font-family:'JetBrains Mono','Inter',monospace;color:#B8D0E8;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.55;display:none;}
@@ -1154,13 +1158,34 @@ body.light .bottom-bar{background:#E8E5E0;border-top-color:rgba(0,0,0,.1);}
 body.light .bb-input{background:rgba(240,237,232,.9);border-color:rgba(0,120,115,.2);color:#1C2B3A;}
 body.light .bb-btn{border-color:rgba(0,126,120,.35);background:rgba(0,126,120,.06);color:#007E78;}
 body.light .bb-lbl{color:rgba(0,126,120,.55);}
-body.light .preset-chip{background:#E2DED8;border-color:rgba(0,0,0,.12);}
-body.light .preset-chip-name{color:#2A4060;}
+body.light .preset-chip{background:#E2DED8;border-color:rgba(0,0,0,.15);}
+body.light .preset-chip-name{color:#1A3050;font-weight:700;}
+body.light .preset-chip-name:hover{color:#007E78;}
+body.light .preset-chip-del{color:rgba(160,40,40,.65);}
+body.light .preset-chip-del:hover{color:#CC1010;}
 body.light .resp-box{background:#F0EDE8;border-color:rgba(0,0,0,.1);color:#1C2B3A;}
-body.light .cmp-panel{background:#F0EDE8;border-top-color:rgba(176,32,200,.35);}
-body.light .cmp-hd{background:#E8E5E0;}
-body.light .cmp-save-input,.body.light .cmp-select,.body.light .cmp-prompt-input{background:#F8F6F2;border-color:rgba(0,120,115,.2);color:#1C2B3A;}
-body.light .cmp-out-box{background:#F8F6F2;border-color:rgba(0,0,0,.1);color:#1C2B3A;}
+body.light .cmp-panel{background:#F0EDE8;border-top-color:rgba(176,32,200,.55);}
+body.light .cmp-hd{background:#E2DED8;}
+body.light .cmp-title{color:#8B10A8;font-weight:900;}
+body.light .cmp-close{color:#1C2B3A;border-color:rgba(0,0,0,.25);background:rgba(0,0,0,.04);}
+body.light .cmp-close:hover{color:#8B10A8;border-color:rgba(176,32,200,.5);}
+body.light .cmp-save-lbl{color:#005050;font-weight:900;}
+body.light .cmp-save-input{background:#fff;border-color:rgba(0,120,115,.35);color:#0A1C2A;font-weight:600;}
+body.light .cmp-save-btn{border-color:rgba(0,120,115,.4);background:rgba(0,126,120,.08);color:#005858;font-weight:900;}
+body.light .cmp-save-msg{color:#007E78;font-weight:800;}
+body.light .cmp-sel-lbl{color:#005050;font-weight:900;}
+body.light .cmp-select{background:#fff;border-color:rgba(0,120,115,.35);color:#0A1C2A;font-weight:600;}
+body.light .cmp-prompt-input{background:#fff;border-color:rgba(0,120,115,.35);color:#0A1C2A;font-weight:600;}
+body.light .cmp-prompt-input::placeholder{color:rgba(0,30,40,.35);}
+body.light .cmp-run-btn{border-color:rgba(176,32,200,.55);background:rgba(176,32,200,.08);color:#8B10A8;font-weight:900;}
+body.light .cmp-run-btn:hover{background:rgba(176,32,200,.16);border-color:#8B10A8;}
+body.light .cmp-status{color:#007E78;font-weight:800;}
+body.light .cmp-out-lbl{color:#005050;font-weight:900;}
+body.light .cmp-out-box{background:#fff;border-color:rgba(0,0,0,.12);color:#0A1C2A;font-weight:500;}
+body.light .cmp-score-hd{color:#005050;font-weight:900;}
+body.light .cmp-metric-name{color:#2A4060;font-weight:800;}
+body.light .cmp-winner{color:#007E78;font-weight:900;}
+body.light .cmp-summary{color:#0A1C2A;font-weight:500;border-top-color:rgba(0,0,0,.1);}
 /* ── Compare open button — flagship feature ── */
 @keyframes cmp-pulse{
   0%,100%{box-shadow:0 0 10px rgba(217,70,239,.35),0 0 22px rgba(217,70,239,.18),inset 0 0 8px rgba(217,70,239,.12);}
@@ -1224,7 +1249,7 @@ body.light .cmp-open-btn{border-color:rgba(176,32,200,.85);background:linear-gra
   <button class="hdr-action" onclick="resetDefaults()">RESET</button>
   <button class="cmp-open-btn" onclick="openCompare()">⊕ COMPARE</button>
   <button class="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
-  <button class="expand-btn" id="expand-btn" onclick="toggleCompact()" title="Expand / Collapse">⊟</button>
+  <button class="expand-btn" id="expand-btn" onclick="toggleCompact()" title="Expand to full view">⊞</button>
 </div>
 <div class="stage">
   <div class="col t1">
@@ -1659,13 +1684,8 @@ async function runCompare(){
 async function abortTask(){
   try{await fetch('/abort',{method:'POST'});}catch(e){}
 }
-let _compact=false;
 function toggleCompact(){
-  _compact=!_compact;
-  const btn=document.getElementById('expand-btn');
-  if(btn)btn.textContent=_compact?'⊞':'⊟';
-  const bb=document.querySelector('.bottom-bar');
-  if(bb)bb.style.display=_compact?'none':'flex';
+  window.location.href='/app';
 }
 loadPresets();
 (function(){if(localStorage.getItem('gain_theme')==='light')document.body.classList.add('light');})();
@@ -4544,13 +4564,7 @@ function toggleTheme() {
   }
 })();
 function toggleCompact() {
-  const c = document.getElementById('console');
-  const compact = c.classList.toggle('compact');
-  const btn = document.getElementById('compact-btn');
-  if (btn) btn.textContent = compact ? '⊞' : '⊟';
-  const hero = document.querySelector('.hero');
-  if (hero) hero.style.display = compact ? 'none' : '';
-  localStorage.setItem('gain_compact', compact ? '1' : '0');
+  window.location.href = '/proto';
 }
 </script>
 
