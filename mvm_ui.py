@@ -32,6 +32,33 @@ PID_FILE     = Path.home() / ".streamfader" / "ctrl.pid"
 PORT  = int(os.environ.get("PORT", 5570))
 MODEL = os.environ.get("CTRL_MODEL", "claude-sonnet-4-6")
 
+# ── Free tier ──────────────────────────────────────────────────────────────────
+FREE_TIER_LIMIT = 3
+_free_usage: dict[str, int] = {}  # ip_hash → call count (resets on deploy)
+
+def _ip_hash() -> str:
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    return hashlib.sha256(ip.encode()).hexdigest()[:16]
+
+def _free_tier_check() -> tuple[bool, int]:
+    """Returns (allowed, calls_used). Bypassed for local and logged-in users."""
+    if not os.environ.get("SUPABASE_URL"):
+        return True, 0
+    # Check for auth token — logged-in users use the Supabase gate instead
+    auth = request.headers.get("Authorization", "")
+    cookie_tok = request.cookies.get("sb-access-token", "")
+    if auth.startswith("Bearer ") or cookie_tok:
+        return True, 0
+    h = _ip_hash()
+    used = _free_usage.get(h, 0)
+    return used < FREE_TIER_LIMIT, used
+
+def _free_tier_increment():
+    if not os.environ.get("SUPABASE_URL"):
+        return
+    h = _ip_hash()
+    _free_usage[h] = _free_usage.get(h, 0) + 1
+
 MODELS_AVAILABLE = {
     "haiku":  "claude-haiku-4-5-20251001",
     "sonnet": "claude-sonnet-4-6",
@@ -410,10 +437,14 @@ def set_state():
 
 @app.route("/run", methods=["POST"])
 def run_task():
+    allowed, used = _free_tier_check()
+    if not allowed:
+        return jsonify({"error": "free_limit", "used": used, "limit": FREE_TIER_LIMIT}), 402
     data    = request.get_json() or {}
     task    = data.get("task", "").strip()
     if not task:
         return jsonify({"error": "No task provided"}), 400
+    _free_tier_increment()
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     user_id = None  # always use local state.json — skip Supabase lookup to avoid blocking
 
@@ -446,6 +477,10 @@ def run_task():
 @app.route("/exec", methods=["POST"])
 def exec_task():
     """Agentic loop — Claude with file tools, runs entirely in Flask, no CLI needed."""
+    allowed, used = _free_tier_check()
+    if not allowed:
+        return jsonify({"error": "free_limit", "used": used, "limit": FREE_TIER_LIMIT}), 402
+    _free_tier_increment()
     data = request.get_json() or {}
     task = data.get("task", "").strip()
     if not task:
@@ -579,6 +614,11 @@ COMPARE_LOG = Path.home() / ".streamfader" / "comparisons.json"
 
 @app.route("/compare", methods=["POST"])
 def compare_presets():
+    # ── Free tier gate (anonymous users) ──────────────────────────────────
+    allowed, used = _free_tier_check()
+    if not allowed:
+        return jsonify({"error": "free_limit", "used": used, "limit": FREE_TIER_LIMIT}), 402
+    _free_tier_increment()
     # ── Plan gate ──────────────────────────────────────────────────────────
     if SUPABASE_URL:
         token = _token_from_request()
@@ -4796,7 +4836,42 @@ function launchFireworks() {
 
   requestAnimationFrame(frame);
 }
+
+// ── Free tier paywall ─────────────────────────────────────────────────────────
+function showPaywall() {
+  document.getElementById('paywall-overlay').style.display = 'flex';
+}
+
+function _patchFetch() {
+  const orig = window.fetch;
+  window.fetch = async function(...args) {
+    const res = await orig.apply(this, args);
+    if (res.status === 402) {
+      const clone = res.clone();
+      clone.json().then(d => { if (d.error === 'free_limit') showPaywall(); }).catch(()=>{});
+    }
+    return res;
+  };
+}
+_patchFetch();
 </script>
+
+<!-- ── PAYWALL MODAL ── -->
+<div id="paywall-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(8px);">
+  <div style="background:#080E18;border:1px solid rgba(0,221,212,.25);border-radius:10px;width:420px;max-width:92vw;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.8),0 0 0 1px rgba(0,221,212,.08);">
+    <div style="height:3px;background:linear-gradient(90deg,#00DDD4,#8B5CF6,#D946EF);"></div>
+    <div style="padding:32px 32px 28px;">
+      <div style="font-family:'Abril Fatface',serif;font-size:28px;background:linear-gradient(130deg,#00E8FF,#A0C8FF,#D946EF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;">You've used your 3 free runs.</div>
+      <div style="font-size:13px;color:#6A8AA8;line-height:1.7;margin-bottom:28px;">Gain is in early access. Join the waitlist or sign in to keep going.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <a href="https://gain.creativekonsoles.com" target="_blank" style="display:block;height:44px;background:rgba(0,221,212,.1);border:1px solid rgba(0,221,212,.4);border-radius:4px;color:#00DDD4;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;text-decoration:none;display:flex;align-items:center;justify-content:center;transition:background .15s;">Join the Waitlist</a>
+        <button onclick="document.getElementById('paywall-overlay').style.display='none';document.querySelector('.login-btn')&&document.querySelector('.login-btn').click();" style="height:44px;background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:4px;color:#6A8AA8;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;">Sign In</button>
+      </div>
+      <div style="margin-top:20px;font-size:9px;color:#405870;text-align:center;letter-spacing:.06em;">gain.creativekonsoles.com</div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>"""
 
