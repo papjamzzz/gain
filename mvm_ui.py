@@ -1186,6 +1186,25 @@ body.light .cmp-score-hd{color:#005050;font-weight:900;}
 body.light .cmp-metric-name{color:#2A4060;font-weight:800;}
 body.light .cmp-winner{color:#007E78;font-weight:900;}
 body.light .cmp-summary{color:#0A1C2A;font-weight:500;border-top-color:rgba(0,0,0,.1);}
+/* ── Muted track — grey out fader ── */
+.col.muted .f-fill{
+  background:linear-gradient(0deg,rgba(55,65,75,.85) 0%,rgba(70,80,90,.65) 40%,rgba(88,98,108,.4) 75%,rgba(105,115,125,.18) 100%);
+  box-shadow:none;transition:background .3s,box-shadow .3s;
+}
+.col.muted .f-thumb{
+  background:linear-gradient(90deg,transparent,rgba(140,150,160,.45) 20%,rgba(180,190,200,.65) 50%,rgba(140,150,160,.45) 80%,transparent);
+  box-shadow:0 0 6px rgba(150,160,170,.3);
+  transition:background .3s,box-shadow .3s;
+}
+.col.muted .f-track{border-color:rgba(60,70,80,.3);}
+.col.muted .col-flbl{color:#3A5060;text-shadow:none;transition:color .3s;}
+.col.muted .col-fval{color:#3A5060;text-shadow:none;transition:color .3s;}
+.col.muted .col-kval{color:#3A5060;text-shadow:none;}
+/* Light theme muted */
+body.light .col.muted .f-fill{background:linear-gradient(0deg,rgba(160,165,170,.75) 0%,rgba(175,180,185,.55) 45%,rgba(190,195,200,.3) 80%,rgba(205,210,215,.12) 100%);box-shadow:none;}
+body.light .col.muted .f-thumb{background:linear-gradient(90deg,transparent,rgba(120,128,136,.6) 20%,rgba(150,158,166,.8) 50%,rgba(120,128,136,.6) 80%,transparent);box-shadow:0 0 4px rgba(120,128,136,.4);}
+body.light .col.muted .col-flbl{color:#9AA8B8;text-shadow:none;}
+body.light .col.muted .col-fval{color:#9AA8B8;text-shadow:none;}
 /* ── Compare open button — flagship feature ── */
 @keyframes cmp-pulse{
   0%,100%{box-shadow:0 0 10px rgba(217,70,239,.35),0 0 22px rgba(217,70,239,.18),inset 0 0 8px rgba(217,70,239,.12);}
@@ -1451,6 +1470,8 @@ function applyState(s){
   ['t1','t2','t3','t4'].forEach(t=>{
     const btn=document.getElementById('mbtn-'+t);
     if(btn)btn.classList.toggle('active',s[t+'_on']===false);
+    const col=document.querySelector('.col.'+t);
+    if(col)col.classList.toggle('muted',s[t+'_on']===false);
   });
   const tk=(l,b,v)=>b?l+': '+b+' · '+v:l+': '+v;
   document.getElementById('hdr-vals').textContent=[
@@ -1472,6 +1493,8 @@ function toggleTrack(t){
   lastState[key]=nv;
   const btn=document.getElementById('mbtn-'+t);
   if(btn)btn.classList.toggle('active',!nv);
+  const col=document.querySelector('.col.'+t);
+  if(col)col.classList.toggle('muted',!nv);
   set(key,nv);
 }
 // Initialize after layout paints so offsetHeight is available
