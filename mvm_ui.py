@@ -1005,7 +1005,7 @@ HTML = """<!DOCTYPE html>
 body{background:#060A0F;font-family:'Inter',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;color:#D8EAF8;user-select:none;}
 .hdr{height:64px;display:flex;align-items:center;padding:0 24px;border-bottom:1px solid #162030;flex-shrink:0;background:#030507;position:relative;}
 .brand{font-family:'Abril Fatface',serif;font-size:42px;letter-spacing:.06em;background:linear-gradient(130deg,#00E8FF,#A0C8FF,#C0A0FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 8px rgba(0,200,255,.5));}
-.hdr-center{margin-left:24px;text-align:left;pointer-events:none;flex-shrink:0;}
+.hdr-center{text-align:right;pointer-events:none;flex-shrink:0;}
 .hdr-lbl{font-size:7px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#00DDD4;opacity:.9;}
 .hdr-vals{font-size:8px;color:#D8EAF8;letter-spacing:.04em;margin-top:2px;}
 .proto-tag{margin-left:auto;font-size:9px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:rgba(217,70,239,.7);border:1px solid rgba(217,70,239,.35);padding:5px 12px;border-radius:3px;}
@@ -1217,13 +1217,13 @@ body.light .col.muted .col-fval{color:#9AA8B8;text-shadow:none;}
   color:#F0ABFF;font-size:9px;font-weight:900;letter-spacing:.18em;
   text-transform:uppercase;cursor:pointer;transition:all .15s;white-space:nowrap;
   text-shadow:0 0 10px rgba(255,180,255,1),0 0 22px rgba(217,70,239,.9);
-  flex-shrink:0;touch-action:manipulation;
-  animation:cmp-pulse 2s ease-in-out infinite;
-  font-family:'Inter',sans-serif;margin-left:6px;
+  box-shadow:0 0 18px rgba(217,70,239,.6),0 0 40px rgba(217,70,239,.25),inset 0 0 12px rgba(217,70,239,.15);
+  flex-shrink:0;touch-action:manipulation;font-family:'Inter',sans-serif;
+  position:absolute;left:50%;transform:translateX(-50%);
 }
 .cmp-open-btn:hover{
   background:linear-gradient(180deg,rgba(180,50,220,.5) 0%,rgba(130,20,180,.6) 100%);
-  border-color:#F0ABFF;animation:none;
+  border-color:#F0ABFF;
   box-shadow:0 0 30px rgba(217,70,239,1),0 0 60px rgba(217,70,239,.6),inset 0 0 24px rgba(217,70,239,.3);
 }
 body.light .cmp-open-btn{border-color:rgba(176,32,200,.85);background:linear-gradient(180deg,rgba(176,32,200,.18) 0%,rgba(140,10,170,.28) 100%);color:#B020C8;text-shadow:none;}
@@ -1261,14 +1261,14 @@ body.light .cmp-open-btn{border-color:rgba(176,32,200,.85);background:linear-gra
 <body>
 <div class="hdr">
   <div class="brand">GAIN</div>
-  <div class="hdr-center">
+  <button class="hdr-action" onclick="resetDefaults()">RESET</button>
+  <button class="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
+  <a href="/proto" class="expand-btn" id="expand-btn" title="Expand to full view">⊞</a>
+  <button class="cmp-open-btn" onclick="openCompare()">⊕ COMPARE</button>
+  <div class="hdr-center" style="margin-left:auto;">
     <div class="hdr-lbl">Current Settings</div>
     <div class="hdr-vals" id="hdr-vals">—</div>
   </div>
-  <button class="hdr-action" onclick="resetDefaults()">RESET</button>
-  <button class="cmp-open-btn" onclick="openCompare()">⊕ COMPARE</button>
-  <button class="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
-  <a href="/proto" class="expand-btn" id="expand-btn" title="Expand to full view">⊞</a>
 </div>
 <div class="stage">
   <div class="col t1">
