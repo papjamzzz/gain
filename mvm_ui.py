@@ -1006,8 +1006,8 @@ body{background:#060A0F;font-family:'Inter',sans-serif;height:100vh;display:flex
 .hdr{height:64px;display:flex;align-items:center;padding:0 24px;border-bottom:1px solid #162030;flex-shrink:0;background:#030507;position:relative;}
 .brand{font-family:'Abril Fatface',serif;font-size:42px;letter-spacing:.06em;background:linear-gradient(130deg,#00E8FF,#A0C8FF,#C0A0FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 8px rgba(0,200,255,.5));}
 .hdr-center{position:absolute;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;}
-.hdr-lbl{font-size:9px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#00DDD4;opacity:.9;}
-.hdr-vals{font-size:11px;color:#D8EAF8;letter-spacing:.04em;margin-top:2px;}
+.hdr-lbl{font-size:7px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#00DDD4;opacity:.9;}
+.hdr-vals{font-size:8px;color:#D8EAF8;letter-spacing:.04em;margin-top:2px;}
 .proto-tag{margin-left:auto;font-size:9px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:rgba(217,70,239,.7);border:1px solid rgba(217,70,239,.35);padding:5px 12px;border-radius:3px;}
 .theme-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(0,200,192,.45);background:rgba(0,200,192,.06);color:#00DDD4;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-left:10px;flex-shrink:0;}
 .theme-btn:hover{border-color:#00DDD4;background:rgba(0,200,192,.16);}
