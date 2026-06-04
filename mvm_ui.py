@@ -1473,12 +1473,12 @@ function applyState(s){
     const col=document.querySelector('.col.'+t);
     if(col)col.classList.toggle('muted',s[t+'_on']===false);
   });
-  const tk=(l,b,v)=>b?l+': '+b+' · '+v:l+': '+v;
+  const tk=(on,l,b,v)=>on===false?l+': OFF':(b?l+': '+b+' · '+v:l+': '+v);
   document.getElementById('hdr-vals').textContent=[
-    tk('MODE',s.mode,(s.intensity??0.5).toFixed(2)),
-    tk('CONFIDENCE',s.stance,(s.certainty??0.5).toFixed(2)),
-    tk('SCOPE',s.filter,(s.scope??0.5).toFixed(2)),
-    tk('VOICE',s.voice,(s.room??0.5).toFixed(2)),
+    tk(s.t1_on,'MODE',s.mode,(s.intensity??0.5).toFixed(2)),
+    tk(s.t2_on,'CONF',s.stance,(s.certainty??0.5).toFixed(2)),
+    tk(s.t3_on,'SCOPE',s.filter,(s.scope??0.5).toFixed(2)),
+    tk(s.t4_on,'VOICE',s.voice,(s.room??0.5).toFixed(2)),
   ].join('  ·  ');
 }
 async function set(f,v){await fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[f]:v})});}
