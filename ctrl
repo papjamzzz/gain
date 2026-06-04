@@ -117,18 +117,49 @@ def build_system_prompt(state: dict) -> str:
         depth     = state["depth"]
 
         if mode == "EXPLORE":
-            rules.append("MODE: EXPLORE\n- Analysis only. No code changes.\n- End with a single decision point. Nothing else.")
+            rules.append(
+                "MODE: EXPLORE\n"
+                "- Think out loud. Show your full reasoning.\n"
+                "- Cover multiple approaches, angles, and trade-offs.\n"
+                "- Ask questions back if the problem is ambiguous.\n"
+                "- Do NOT write code or make changes. Analysis only.\n"
+                "- End with a list of open questions or decision points."
+            )
+            # Intensity means depth of exploration, not output compression
+            if intensity >= 0.7:
+                rules.append("INTENSITY: HIGH — explore thoroughly, go deep on every angle, be verbose.")
+            elif intensity >= 0.4:
+                rules.append("INTENSITY: MED — cover the main angles, moderate depth.")
+            else:
+                rules.append("INTENSITY: LOW — quick surface scan, highlight the obvious options only.")
         elif mode == "FIX":
-            rules.append("MODE: FIX\n- Identify one root cause only.\n- Produce one fix only.\n- Do not address secondary issues.")
+            rules.append(
+                "MODE: FIX\n"
+                "- Identify one root cause only.\n"
+                "- Produce one targeted fix.\n"
+                "- Do not address secondary issues.\n"
+                "- No refactoring, no cleanup, no extras."
+            )
+            if intensity >= 0.7:
+                rules.append("INTENSITY: HIGH — surgical precision, fix only, zero commentary.")
+            elif intensity >= 0.4:
+                rules.append("INTENSITY: MED — brief explanation of the fix, then implement.")
+            else:
+                rules.append("INTENSITY: LOW — explain the root cause fully before fixing.")
         elif mode == "BUILD":
-            rules.append("MODE: BUILD\n- Implement one atomic change only.\n- No refactoring unless explicitly required.")
-
-        if intensity >= 0.7:
-            rules.append("INTENSITY: HIGH — minimal output, direct execution only.")
-        elif intensity >= 0.4:
-            rules.append("INTENSITY: MED — concise reasoning, focused output.")
-        else:
-            rules.append("INTENSITY: LOW — verbose reasoning, exploratory tone.")
+            rules.append(
+                "MODE: BUILD\n"
+                "- Execute immediately. No exploration, no alternatives.\n"
+                "- Pick the single best approach and implement it.\n"
+                "- No explanation of other options.\n"
+                "- Output only what was built, nothing else."
+            )
+            if intensity >= 0.7:
+                rules.append("INTENSITY: HIGH — minimal output, direct execution only. Code first, no preamble.")
+            elif intensity >= 0.4:
+                rules.append("INTENSITY: MED — brief reasoning, then implement.")
+            else:
+                rules.append("INTENSITY: LOW — explain the approach before building.")
 
         if depth >= 0.7:
             rules.append("DEPTH: HIGH — deeper diagnostic reasoning allowed.")
@@ -218,15 +249,24 @@ def build_system_prompt(state: dict) -> str:
         elif voice == "STUDIO":
             rules.append("VOICE: STUDIO — professional, measured, clean response with minimal framing.")
 
-    return "\n".join([
-        *rules,
-        "",
-        "GLOBAL CONSTRAINTS:",
-        "- One action per run.",
-        "- No multi-step planning chains.",
-        "- No combined modes.",
-        "- Stop immediately after completing the task.",
-    ])
+    mode = state.get("mode", "")
+    if mode == "EXPLORE":
+        constraints = [
+            "",
+            "CONSTRAINTS:",
+            "- No code changes under any circumstances.",
+            "- Respond with analysis, questions, and options only.",
+        ]
+    else:
+        constraints = [
+            "",
+            "CONSTRAINTS:",
+            "- One action per run.",
+            "- No multi-step planning chains.",
+            "- Stop immediately after completing the task.",
+        ]
+
+    return "\n".join([*rules, *constraints])
 
 
 # ── Claude invocation ─────────────────────────────────────────────────────────
