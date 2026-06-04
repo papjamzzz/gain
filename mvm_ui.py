@@ -1249,7 +1249,7 @@ body.light .cmp-open-btn{border-color:rgba(176,32,200,.85);background:linear-gra
   <button class="hdr-action" onclick="resetDefaults()">RESET</button>
   <button class="cmp-open-btn" onclick="openCompare()">⊕ COMPARE</button>
   <button class="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">◐</button>
-  <button class="expand-btn" id="expand-btn" onclick="toggleCompact()" title="Expand to full view">⊞</button>
+  <a href="/proto" class="expand-btn" id="expand-btn" title="Expand to full view">⊞</a>
 </div>
 <div class="stage">
   <div class="col t1">
@@ -2985,7 +2985,7 @@ body.light .model-dial-btn.active{background:rgba(0,126,120,.08);border-color:va
     <button class="reset-btn" onclick="resetDefaults()">RESET</button>
     <button class="cmp-open-btn" onclick="openCompare()">⊕ COMPARE</button>
     <div style="width:1px;height:24px;background:rgba(0,200,192,.15);flex-shrink:0;"></div>
-    <button class="settings-btn" id="compact-btn" onclick="toggleCompact()" title="Expand / Collapse (` key)">⊟</button>
+    <a href="/app" class="settings-btn" id="compact-btn" title="Collapse to compact view">⊟</a>
     <button class="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
     <button class="faq-btn" onclick="openFaq()">?</button>
   </div>
