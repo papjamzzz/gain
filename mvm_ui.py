@@ -4983,6 +4983,47 @@ _patchFetch();
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+# ── Max for Live bridge ────────────────────────────────────────────────────────
+
+@app.route("/m4l/state")
+def m4l_state():
+    return jsonify(read_state())
+
+@app.route("/m4l/ask", methods=["POST"])
+def m4l_ask():
+    data   = request.get_json() or {}
+    prompt = data.get("prompt", "").strip()
+    preset = data.get("preset")
+    if not prompt:
+        return jsonify({"error": "No prompt"}), 400
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not _anthropic or not api_key:
+        return jsonify({"error": "Claude not available"}), 500
+    state = _load_preset(preset) if preset else read_state()
+    try:
+        client = _anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model=_active_model, max_tokens=1024,
+            system=_build_prompt(state),
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return jsonify({
+            "text":   msg.content[0].text,
+            "tokens": msg.usage.output_tokens,
+            "state":  state,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def _load_preset(name):
+    f = PRESETS_DIR / f"{name}.json"
+    return json.loads(f.read_text()) if f.exists() else read_state()
+
+@app.route("/m4l/presets")
+def m4l_presets():
+    names = [f.stem for f in PRESETS_DIR.glob("*.json")] if PRESETS_DIR.exists() else []
+    return jsonify(names)
+
 # Always open clean — reset to neutral state on every server start
 write_state(DEFAULT_STATE.copy())
 
