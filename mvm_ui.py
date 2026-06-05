@@ -1451,9 +1451,13 @@ body.light .cmp-open-btn{border-color:rgba(176,32,200,.85);background:linear-gra
 <div class="cmp-panel" id="cmp-panel">
   <div class="cmp-hd">
     <span class="cmp-title">⊕ compare presets</span>
-    <button class="cmp-close" onclick="closeCompare()">✕</button>
+    <div style="display:flex;gap:6px;margin-left:auto;">
+      <button class="cmp-tab-btn active" id="cmp-tab-run" onclick="switchCmpTab('run')">RUN</button>
+      <button class="cmp-tab-btn" id="cmp-tab-stats" onclick="switchCmpTab('stats')">STATS</button>
+    </div>
+    <button class="cmp-close" onclick="closeCompare()" style="margin-left:10px;">✕</button>
   </div>
-  <div class="cmp-body">
+  <div class="cmp-body" id="cmp-body">
     <div class="cmp-save-row">
       <span class="cmp-save-lbl">SAVE CURRENT AS</span>
       <input class="cmp-save-input" id="cmp-save-input" type="text" placeholder="preset name…" maxlength="40" onkeydown="if(event.key==='Enter')savePresetFrom('cmp-save-input','cmp-save-msg')">
@@ -1478,6 +1482,11 @@ body.light .cmp-open-btn{border-color:rgba(176,32,200,.85);background:linear-gra
       <div id="cmp-metrics"></div>
       <div class="cmp-summary" id="cmp-summary"></div>
     </div>
+  </div>
+  <!-- STATS TAB -->
+  <div class="cmp-stats-wrap" id="cmp-stats-wrap" style="display:none;">
+    <div class="cmp-stats-total" id="cmp-stats-total"><span>0</span> compare runs total</div>
+    <div id="cmp-stats-presets"></div>
   </div>
 </div>
 
@@ -1710,6 +1719,62 @@ async function runTask(){
 // ── Compare ─────────────────────────────────────────────────────────
 function openCompare(){loadPresets();document.getElementById('cmp-panel').classList.add('open');document.getElementById('cmp-overlay').classList.add('open');}
 function closeCompare(){document.getElementById('cmp-panel').classList.remove('open');document.getElementById('cmp-overlay').classList.remove('open');}
+
+function switchCmpTab(tab) {
+  const runBody  = document.getElementById('cmp-body') || document.querySelector('.cmp-body');
+  const statsWrap = document.getElementById('cmp-stats-wrap');
+  const tabRun   = document.getElementById('cmp-tab-run');
+  const tabStats = document.getElementById('cmp-tab-stats');
+  if (tab === 'stats') {
+    if (runBody)   runBody.style.display = 'none';
+    if (statsWrap) statsWrap.style.display = '';
+    if (tabRun)    tabRun.classList.remove('active');
+    if (tabStats)  tabStats.classList.add('active');
+    loadCmpStats();
+  } else {
+    if (runBody)   runBody.style.display = '';
+    if (statsWrap) statsWrap.style.display = 'none';
+    if (tabRun)    tabRun.classList.add('active');
+    if (tabStats)  tabStats.classList.remove('active');
+  }
+}
+
+async function loadCmpStats() {
+  const presetsEl = document.getElementById('cmp-stats-presets');
+  const totalEl   = document.getElementById('cmp-stats-total');
+  if (!presetsEl) return;
+  presetsEl.innerHTML = '<div class="cmp-stats-empty">Loading…</div>';
+  try {
+    const r = await fetch('/compare/stats');
+    const d = await r.json();
+    if (totalEl) totalEl.innerHTML = '<span>' + (d.runs || 0) + '</span> compare runs total';
+    const presets = Object.entries(d.presets || {});
+    if (!presets.length) { presetsEl.innerHTML = '<div class="cmp-stats-empty">No compare runs yet. Run a comparison first.</div>'; return; }
+    const METRICS = ['adherence','depth','clarity','efficiency','confidence'];
+    const LABELS  = {adherence:'Adherence',depth:'Depth',clarity:'Clarity',efficiency:'Efficiency',confidence:'Confidence'};
+    presetsEl.innerHTML = presets.sort((a,b)=>b[1].runs-a[1].runs).map(([name, s]) => {
+      const winPct = s.runs ? Math.round(s.wins / s.runs * 100) : 0;
+      const bars = METRICS.map(m => {
+        const v = s[m] || 0;
+        return '<div class="cmp-stat-row">' +
+          '<span class="cmp-stat-lbl">' + LABELS[m] + '</span>' +
+          '<div class="cmp-stat-bar"><div class="cmp-stat-fill" style="width:' + v + '%"></div></div>' +
+          '<span class="cmp-stat-val">' + v + '</span>' +
+        '</div>';
+      }).join('');
+      return '<div class="cmp-preset-card">' +
+        '<div class="cmp-preset-hdr">' +
+          '<span class="cmp-preset-name">' + esc(name) + '</span>' +
+          '<span class="cmp-preset-runs">' + s.runs + ' run' + (s.runs!==1?'s':'') + '</span>' +
+          '<span class="cmp-preset-win">' + winPct + '% wins</span>' +
+        '</div>' +
+        '<div class="cmp-preset-body">' + bars + '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    presetsEl.innerHTML = '<div class="cmp-stats-empty">Failed to load stats.</div>';
+  }
+}
 async function runCompare(){
   const prompt=(document.getElementById('cmp-prompt').value||'').trim();
   const pa=document.getElementById('cmp-select-a').value;
@@ -3055,6 +3120,23 @@ body.light .model-dial-btn.active{background:rgba(0,126,120,.08);border-color:va
 .cmp-bar-score-b{color:var(--magenta2);}
 .cmp-summary{font-size:14px;line-height:1.8;color:#FFFFFF;font-weight:500;background:#040608;border:1px solid rgba(217,70,239,.25);border-radius:3px;padding:14px 16px;}
 .cmp-no-presets{font-size:12px;color:var(--text3);text-align:center;padding:28px 0;font-style:italic;}
+.cmp-tab-btn{height:26px;padding:0 12px;border-radius:2px;border:1px solid var(--border2);background:transparent;color:var(--text3);font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;}
+.cmp-tab-btn.active{border-color:var(--magenta);background:rgba(217,70,239,.1);color:var(--magenta2);}
+.cmp-stats-wrap{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:16px;}
+.cmp-stats-total{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;}
+.cmp-stats-total span{font-size:28px;font-weight:900;color:var(--magenta2);font-variant-numeric:tabular-nums;margin-right:6px;letter-spacing:-.02em;}
+.cmp-preset-card{background:var(--panel2);border:1px solid var(--border);border-radius:5px;overflow:hidden;}
+.cmp-preset-hdr{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);background:#040608;}
+.cmp-preset-name{font-size:11px;font-weight:800;color:var(--text);letter-spacing:.02em;flex:1;}
+.cmp-preset-runs{font-size:8px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;}
+.cmp-preset-win{font-size:8px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:2px 8px;border-radius:2px;border:1px solid rgba(0,221,212,.35);color:var(--accent);background:rgba(0,221,212,.08);}
+.cmp-preset-body{padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+.cmp-stat-row{display:flex;align-items:center;gap:8px;}
+.cmp-stat-lbl{font-size:8px;font-weight:700;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;width:90px;flex-shrink:0;}
+.cmp-stat-bar{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;}
+.cmp-stat-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#005850,var(--accent));transition:width .6s ease;}
+.cmp-stat-val{font-size:9px;font-weight:800;color:var(--accent);width:28px;text-align:right;font-variant-numeric:tabular-nums;}
+.cmp-stats-empty{text-align:center;padding:48px 20px;color:var(--text3);font-size:12px;font-style:italic;}
 </style>
 </head>
 <body>
