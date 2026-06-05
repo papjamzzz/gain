@@ -897,6 +897,10 @@ def proto_view():
     return HTML
 
 
+@app.route("/companion")
+def companion():
+    return COMPANION_HTML
+
 @app.route("/health")
 def health():
     return jsonify({"ok": True, "model": _active_model,
@@ -4982,6 +4986,170 @@ _patchFetch();
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
+# ── Companion UI ──────────────────────────────────────────────────────────────
+
+COMPANION_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gain — Companion</title>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#030507;font-family:'Inter',sans-serif;color:#D8EAF8;width:380px;min-height:100vh;overflow-x:hidden;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:#060A0F;}::-webkit-scrollbar-thumb{background:#1E2E40;border-radius:2px;}
+
+.hdr{padding:12px 16px 10px;border-bottom:1px solid #162030;display:flex;align-items:center;gap:8px;background:#020406;position:sticky;top:0;z-index:10;}
+.hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,221,212,.4),transparent);}
+.brand{font-family:'Abril Fatface',serif;font-size:20px;background:linear-gradient(130deg,#00E8FF,#A0C8FF,#D946EF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#34D399;box-shadow:0 0 6px #34D399;flex-shrink:0;}
+.status-dot.off{background:#405870;box-shadow:none;}
+.mode-tag{margin-left:auto;font-size:7px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;padding:2px 8px;border-radius:2px;border:1px solid rgba(0,221,212,.35);color:#00DDD4;background:rgba(0,221,212,.06);}
+
+.state-bar{display:flex;gap:0;border-bottom:1px solid #162030;}
+.state-ch{flex:1;padding:10px 12px;border-right:1px solid #162030;position:relative;overflow:hidden;}
+.state-ch:last-child{border-right:none;}
+.state-fill{position:absolute;bottom:0;left:0;right:0;opacity:.15;transition:height .3s ease;}
+.t1 .state-fill{background:#00DDD4;}
+.t2 .state-fill{background:#8B5CF6;}
+.t3 .state-fill{background:#D946EF;}
+.state-lbl{font-size:7px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#405870;position:relative;}
+.state-val{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.02em;position:relative;}
+.t1 .state-val{color:#00DDD4;text-shadow:0 0 16px rgba(0,221,212,.3);}
+.t2 .state-val{color:#A78BFA;text-shadow:0 0 16px rgba(139,92,246,.3);}
+.t3 .state-val{color:#F0ABFF;text-shadow:0 0 16px rgba(217,70,239,.3);}
+
+.mode-btns{display:flex;gap:0;border-bottom:1px solid #162030;}
+.mode-btn{flex:1;height:36px;border:none;background:#060A0F;color:#405870;font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;border-right:1px solid #162030;}
+.mode-btn:last-child{border-right:none;}
+.mode-btn:hover{color:#D8EAF8;}
+.mode-btn.active-build{background:rgba(0,221,212,.08);color:#00DDD4;}
+.mode-btn.active-explore{background:rgba(139,92,246,.08);color:#A78BFA;}
+
+.ask-wrap{padding:12px 14px;border-bottom:1px solid #162030;}
+.ask-row{display:flex;gap:8px;margin-bottom:0;}
+.ask-input{flex:1;height:36px;background:#0A1018;border:1px solid #1E2E40;border-radius:4px;color:#D8EAF8;font-size:12px;font-family:'Inter',sans-serif;padding:0 12px;outline:none;transition:border-color .15s;}
+.ask-input:focus{border-color:#00DDD4;}
+.ask-btn{height:36px;padding:0 16px;border-radius:4px;border:1px solid rgba(0,221,212,.4);background:rgba(0,221,212,.08);color:#00DDD4;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;flex-shrink:0;}
+.ask-btn:hover{background:rgba(0,221,212,.18);}
+.ask-btn:disabled{opacity:.4;cursor:default;}
+.ask-status{font-size:9px;color:#405870;margin-top:6px;min-height:14px;letter-spacing:.04em;}
+
+.response-wrap{padding:12px 14px;}
+.response-lbl{font-size:7px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:#405870;margin-bottom:8px;}
+.response-box{background:#060A0F;border:1px solid #162030;border-radius:4px;padding:12px;min-height:160px;max-height:320px;overflow-y:auto;font-size:12px;line-height:1.75;color:#A0BCD8;white-space:pre-wrap;font-family:'Inter',sans-serif;}
+.response-box.empty{color:#2A3A4A;font-style:italic;}
+.token-note{font-size:9px;color:#2A3A4A;margin-top:6px;text-align:right;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="brand">Gain</div>
+  <div class="status-dot off" id="dot"></div>
+  <div class="mode-tag" id="mode-tag">—</div>
+</div>
+
+<div class="state-bar">
+  <div class="state-ch t1">
+    <div class="state-fill" id="fill-intensity"></div>
+    <div class="state-lbl">Intensity</div>
+    <div class="state-val" id="val-intensity">—</div>
+  </div>
+  <div class="state-ch t2">
+    <div class="state-fill" id="fill-depth"></div>
+    <div class="state-lbl">Depth</div>
+    <div class="state-val" id="val-depth">—</div>
+  </div>
+  <div class="state-ch t3">
+    <div class="state-fill" id="fill-room"></div>
+    <div class="state-lbl">Verbosity</div>
+    <div class="state-val" id="val-room">—</div>
+  </div>
+</div>
+
+<div class="mode-btns">
+  <button class="mode-btn" id="btn-build"  onclick="setMode('BUILD')">Build</button>
+  <button class="mode-btn" id="btn-explore" onclick="setMode('EXPLORE')">Explore</button>
+</div>
+
+<div class="ask-wrap">
+  <div class="ask-row">
+    <input class="ask-input" id="ask-input" type="text" placeholder="Ask Claude…" onkeydown="if(event.key==='Enter')ask()">
+    <button class="ask-btn" id="ask-btn" onclick="ask()">Ask</button>
+  </div>
+  <div class="ask-status" id="ask-status"></div>
+</div>
+
+<div class="response-wrap">
+  <div class="response-lbl">Response</div>
+  <div class="response-box empty" id="response-box">Ask Claude anything. Same prompt, different state — different output.</div>
+  <div class="token-note" id="token-note"></div>
+</div>
+
+<script>
+let currentState = {};
+
+function applyState(s) {
+  currentState = s;
+  const fields = ['intensity','depth','room'];
+  fields.forEach(f => {
+    const v = s[f] != null ? s[f] : 0;
+    const valEl  = document.getElementById('val-' + f);
+    const fillEl = document.getElementById('fill-' + f);
+    if (valEl)  valEl.textContent  = v.toFixed(2);
+    if (fillEl) fillEl.style.height = (v * 100) + '%';
+  });
+  const mode = s.mode || '—';
+  document.getElementById('mode-tag').textContent = mode;
+  document.getElementById('btn-build').className  = 'mode-btn' + (mode === 'BUILD'   ? ' active-build'   : '');
+  document.getElementById('btn-explore').className = 'mode-btn' + (mode === 'EXPLORE' ? ' active-explore' : '');
+  document.getElementById('dot').className = 'status-dot';
+}
+
+async function setMode(mode) {
+  await fetch('/set', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mode})});
+}
+
+async function ask() {
+  const input  = document.getElementById('ask-input');
+  const btn    = document.getElementById('ask-btn');
+  const status = document.getElementById('ask-status');
+  const box    = document.getElementById('response-box');
+  const note   = document.getElementById('token-note');
+  const prompt = input.value.trim();
+  if (!prompt) return;
+  btn.disabled = true;
+  status.textContent = 'Thinking…';
+  box.className = 'response-box';
+  box.textContent = '';
+  note.textContent = '';
+  try {
+    const r = await fetch('/m4l/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({prompt})});
+    const d = await r.json();
+    if (d.error) { status.textContent = 'Error: ' + d.error; }
+    else {
+      box.textContent = d.text;
+      note.textContent = (d.tokens || 0) + ' tokens · ' + (currentState.mode || '') + ' mode';
+      status.textContent = '';
+      input.value = '';
+    }
+  } catch(e) { status.textContent = 'Error: Gain not running'; }
+  btn.disabled = false;
+}
+
+// SSE — live state sync
+const es = new EventSource('/stream');
+es.onmessage = e => applyState(JSON.parse(e.data));
+es.onerror = () => { document.getElementById('dot').className = 'status-dot off'; };
+
+// Initial state
+fetch('/m4l/state').then(r=>r.json()).then(applyState).catch(()=>{});
+</script>
+</body>
+</html>"""
 
 # ── Max for Live bridge ────────────────────────────────────────────────────────
 
