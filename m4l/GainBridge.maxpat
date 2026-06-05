@@ -380,6 +380,186 @@
 			},
 			{
 				"box" : {
+					"id" : "obj-nano-lbl",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 200, 200, 200, 16 ],
+					"presentation" : 1,
+					"presentation_rect" : [ 200, 48, 200, 16 ],
+					"text" : "nanoKONTROL2 — live",
+					"textcolor" : [ 0.0, 0.87, 0.83, 0.5 ],
+					"fontsize" : 9.0,
+					"fontface" : 1
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-ctlin-intensity",
+					"maxclass" : "newobj",
+					"numinlets" : 0,
+					"numoutlets" : 3,
+					"outlettype" : [ "int", "int", "int" ],
+					"patching_rect" : [ 200, 220, 80, 22 ],
+					"text" : "ctlin 0"
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-ctlin-depth",
+					"maxclass" : "newobj",
+					"numinlets" : 0,
+					"numoutlets" : 3,
+					"outlettype" : [ "int", "int", "int" ],
+					"patching_rect" : [ 290, 220, 80, 22 ],
+					"text" : "ctlin 1"
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-ctlin-room",
+					"maxclass" : "newobj",
+					"numinlets" : 0,
+					"numoutlets" : 3,
+					"outlettype" : [ "int", "int", "int" ],
+					"patching_rect" : [ 380, 220, 80, 22 ],
+					"text" : "ctlin 3"
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-ctlin-explore",
+					"maxclass" : "newobj",
+					"numinlets" : 0,
+					"numoutlets" : 3,
+					"outlettype" : [ "int", "int", "int" ],
+					"patching_rect" : [ 470, 220, 80, 22 ],
+					"text" : "ctlin 32"
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-ctlin-build",
+					"maxclass" : "newobj",
+					"numinlets" : 0,
+					"numoutlets" : 3,
+					"outlettype" : [ "int", "int", "int" ],
+					"patching_rect" : [ 560, 220, 80, 22 ],
+					"text" : "ctlin 64"
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-scale-intensity",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "float" ],
+					"patching_rect" : [ 200, 248, 100, 22 ],
+					"text" : "/ 127."
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-scale-depth",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "float" ],
+					"patching_rect" : [ 290, 248, 100, 22 ],
+					"text" : "/ 127."
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-scale-room",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "float" ],
+					"patching_rect" : [ 380, 248, 100, 22 ],
+					"text" : "/ 127."
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-sel-explore",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "bang", "" ],
+					"patching_rect" : [ 470, 248, 60, 22 ],
+					"text" : "sel 127"
+				}
+			},
+			{
+				"box" : {
+					"id" : "obj-sel-build",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "bang", "" ],
+					"patching_rect" : [ 560, 248, 60, 22 ],
+					"text" : "sel 127"
+				}
+			},
+			{
+				"box" : {
+					"id" : "msg-nano-intensity",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 200, 276, 150, 22 ],
+					"text" : "setfader intensity $1"
+				}
+			},
+			{
+				"box" : {
+					"id" : "msg-nano-depth",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 290, 276, 140, 22 ],
+					"text" : "setfader depth $1"
+				}
+			},
+			{
+				"box" : {
+					"id" : "msg-nano-room",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 380, 276, 140, 22 ],
+					"text" : "setfader room $1"
+				}
+			},
+			{
+				"box" : {
+					"id" : "msg-nano-explore",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 470, 276, 120, 22 ],
+					"text" : "setmode EXPLORE"
+				}
+			},
+			{
+				"box" : {
+					"id" : "msg-nano-build",
+					"maxclass" : "message",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 560, 276, 110, 22 ],
+					"text" : "setmode BUILD"
+				}
+			},
+			{
+				"box" : {
 					"id" : "msg-getstate",
 					"maxclass" : "message",
 					"numinlets" : 2,
@@ -486,7 +666,25 @@
 			{ "patchline" : { "source" : [ "obj-prepend-ask", 0 ], "destination" : [ "obj-1", 0 ] } },
 			{ "patchline" : { "source" : [ "msg-ask", 0 ], "destination" : [ "obj-1", 0 ] } },
 			{ "patchline" : { "source" : [ "obj-2", 4 ], "destination" : [ "obj-status", 0 ] } },
-			{ "patchline" : { "source" : [ "obj-2", 5 ], "destination" : [ "obj-response", 0 ] } }
+			{ "patchline" : { "source" : [ "obj-2", 5 ], "destination" : [ "obj-response", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-ctlin-intensity", 0 ], "destination" : [ "obj-scale-intensity", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-scale-intensity", 0 ], "destination" : [ "msg-nano-intensity", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-scale-intensity", 0 ], "destination" : [ "obj-dial-intensity", 0 ] } },
+			{ "patchline" : { "source" : [ "msg-nano-intensity", 0 ], "destination" : [ "obj-1", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-ctlin-depth", 0 ], "destination" : [ "obj-scale-depth", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-scale-depth", 0 ], "destination" : [ "msg-nano-depth", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-scale-depth", 0 ], "destination" : [ "obj-dial-depth", 0 ] } },
+			{ "patchline" : { "source" : [ "msg-nano-depth", 0 ], "destination" : [ "obj-1", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-ctlin-room", 0 ], "destination" : [ "obj-scale-room", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-scale-room", 0 ], "destination" : [ "msg-nano-room", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-scale-room", 0 ], "destination" : [ "obj-dial-room", 0 ] } },
+			{ "patchline" : { "source" : [ "msg-nano-room", 0 ], "destination" : [ "obj-1", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-ctlin-explore", 0 ], "destination" : [ "obj-sel-explore", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-sel-explore", 0 ], "destination" : [ "msg-nano-explore", 0 ] } },
+			{ "patchline" : { "source" : [ "msg-nano-explore", 0 ], "destination" : [ "obj-1", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-ctlin-build", 0 ], "destination" : [ "obj-sel-build", 0 ] } },
+			{ "patchline" : { "source" : [ "obj-sel-build", 0 ], "destination" : [ "msg-nano-build", 0 ] } },
+			{ "patchline" : { "source" : [ "msg-nano-build", 0 ], "destination" : [ "obj-1", 0 ] } }
 		]
 	}
 }
