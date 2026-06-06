@@ -899,7 +899,12 @@ def proto_view():
 
 @app.route("/companion")
 def companion():
-    return COMPANION_HTML
+    from flask import make_response
+    resp = make_response(COMPANION_HTML)
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/health")
 def health():
@@ -4995,6 +5000,15 @@ COMPANION_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Gain</title>
+<script>
+// Force cache-bust: if URL has no version param, reload with one
+(function(){
+  var v='20260606b';
+  if(window.location.search.indexOf('v='+v)===-1){
+    window.location.replace('/companion?v='+v);
+  }
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -5150,17 +5164,17 @@ function armExplore(){
 }
 async function doExplore(){
   const p=document.getElementById('inp').value.trim();
-  if(!p){armExplore();return;}  // no text — arm and focus input
+  if(!p){armExplore();return;}
   document.getElementById('be').disabled=true;
   document.getElementById('resp').classList.remove('show');
-  setSt('Reading session…');setTk(null);
-  await fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'EXPLORE'})});
+  setSt('Asking Claude…');setTk(null);
   try{
+    await fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'EXPLORE'})}).catch(()=>{});
     const r=await fetch('/explore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p})});
     const d=await r.json();
     if(d.error){setSt('Error: '+d.error);}
-    else{showResp(d.text);setSt('Explore');setTk(d.tokens);document.getElementById('inp').value='';}
-  }catch(e){setSt('Gain not running');}
+    else{showResp(d.text);setSt('Done · '+d.tokens+' tok');setTk(d.tokens);document.getElementById('inp').value='';}
+  }catch(e){setSt('Error: '+e.message);}
   document.getElementById('be').disabled=false;
 }
 async function submit(){
@@ -5451,6 +5465,637 @@ def ableton_build():
         "steps": results,
         "plan_tokens": msg.usage.output_tokens,
     })
+
+# ── Ableton Dashboard API ────────────────────────────────────────────────────
+
+@app.route("/api/session")
+def api_session():
+    return jsonify(_ableton_send("get_session_info"))
+
+@app.route("/api/tracks")
+def api_tracks():
+    info = _ableton_send("get_session_info")
+    count = info.get("result", {}).get("track_count", 0)
+    tracks = []
+    for i in range(count):
+        t = _ableton_send("get_track_info", {"track_index": i})
+        tracks.append(t.get("result", {}))
+    return jsonify({"tracks": tracks})
+
+@app.route("/api/track/<int:idx>")
+def api_track(idx):
+    return jsonify(_ableton_send("get_track_info", {"track_index": idx}))
+
+@app.route("/api/track/<int:idx>/volume", methods=["POST"])
+def api_track_volume(idx):
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("set_track_volume", {"track_index": idx, "volume": d.get("volume", 0.85)}))
+
+@app.route("/api/track/<int:idx>/name", methods=["POST"])
+def api_track_name(idx):
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("set_track_name", {"track_index": idx, "name": d.get("name", "")}))
+
+@app.route("/api/track/<int:idx>/devices")
+def api_track_devices(idx):
+    return jsonify(_ableton_send("get_track_info", {"track_index": idx}))
+
+@app.route("/api/track/<int:idx>/device/<int:dev>/params")
+def api_device_params(idx, dev):
+    return jsonify(_ableton_send("get_device_parameters", {"track_index": idx, "device_index": dev, "show_all": True}))
+
+@app.route("/api/track/<int:idx>/device/<int:dev>/param", methods=["POST"])
+def api_set_param(idx, dev):
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("set_device_parameter", {
+        "track_index": idx, "device_index": dev,
+        "parameter_name": d.get("name", ""), "value": d.get("value", 0)
+    }))
+
+@app.route("/api/track/create", methods=["POST"])
+def api_create_track():
+    return jsonify(_ableton_send("create_midi_track", {}))
+
+@app.route("/api/track/<int:idx>/delete", methods=["POST"])
+def api_delete_track(idx):
+    return jsonify(_ableton_send("delete_track", {"track_index": idx}))
+
+@app.route("/api/tempo", methods=["POST"])
+def api_tempo():
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("set_tempo", {"tempo": d.get("tempo", 120)}))
+
+@app.route("/api/playback/start", methods=["POST"])
+def api_play():
+    return jsonify(_ableton_send("start_playback", {}))
+
+@app.route("/api/playback/stop", methods=["POST"])
+def api_stop():
+    return jsonify(_ableton_send("stop_playback", {}))
+
+@app.route("/api/clip/fire", methods=["POST"])
+def api_fire_clip():
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("fire_clip", {"track_index": d.get("track_index"), "clip_index": d.get("clip_index")}))
+
+@app.route("/api/clip/stop", methods=["POST"])
+def api_stop_clip():
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("stop_clip", {"track_index": d.get("track_index"), "clip_index": d.get("clip_index")}))
+
+@app.route("/api/clip/create", methods=["POST"])
+def api_create_clip():
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("create_clip", {"track_index": d.get("track_index"), "clip_index": d.get("clip_index", 1), "length": d.get("length", 4)}))
+
+@app.route("/api/arrangement")
+def api_arrangement():
+    return jsonify(_ableton_send("get_arrangement_info", {}))
+
+@app.route("/api/browser/tree")
+def api_browser_tree():
+    return jsonify(_ableton_send("get_browser_tree", {"category_type": "all"}))
+
+@app.route("/api/plugins")
+def api_plugins():
+    return jsonify(_ableton_send("list_external_plugins", {}))
+
+@app.route("/api/load_instrument", methods=["POST"])
+def api_load_instrument():
+    d = request.get_json() or {}
+    return jsonify(_ableton_send("load_instrument_or_effect", {"track_index": d.get("track_index"), "uri": d.get("uri", "")}))
+
+@app.route("/api/cue_points")
+def api_cue_points():
+    return jsonify(_ableton_send("get_cue_points", {}))
+
+# ── Dashboard HTML ────────────────────────────────────────────────────────────
+
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gain Studio — Ableton Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#030507;--panel:#060A0F;--panel2:#0A1018;--border:#162030;--border2:#1E2E40;
+  --text:#D8EAF8;--dim:#405870;--teal:#009690;--purple:#7B2FD4;--gold:#C8A843;
+  --red:#C84030;--green:#28A060;
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:12px;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* Header */
+.hdr{display:flex;align-items:center;gap:16px;padding:0 16px;height:48px;border-bottom:1px solid var(--border);background:rgba(3,5,7,.95);flex-shrink:0;}
+.brand{font-size:14px;font-weight:900;letter-spacing:3px;color:var(--teal);}
+.sep{width:1px;height:20px;background:var(--border2);}
+.transport{display:flex;align-items:center;gap:6px;}
+.tbtn{width:30px;height:28px;border-radius:4px;border:1px solid var(--border2);background:var(--panel2);color:var(--text);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.tbtn:hover{border-color:var(--teal);color:var(--teal);}
+.tbtn.active{background:var(--teal);color:#000;border-color:var(--teal);}
+.tempo-box{display:flex;align-items:center;gap:6px;}
+.tempo-box label{font-size:9px;font-weight:800;letter-spacing:.15em;color:var(--dim);text-transform:uppercase;}
+.tempo-input{width:56px;height:28px;background:var(--panel2);border:1px solid var(--border2);border-radius:4px;color:var(--teal);font-size:13px;font-weight:700;text-align:center;font-family:inherit;}
+.session-info{margin-left:auto;display:flex;gap:16px;align-items:center;}
+.stat{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--dim);}
+.stat span{color:var(--text);}
+
+/* Layout */
+.main{display:flex;flex:1;overflow:hidden;}
+
+/* Tracks panel */
+.tracks-panel{width:220px;border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;}
+.panel-hdr{padding:8px 12px;font-size:9px;font-weight:800;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.add-btn{width:18px;height:18px;border-radius:3px;border:1px solid var(--border2);background:transparent;color:var(--dim);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.add-btn:hover{border-color:var(--teal);color:var(--teal);}
+.track-list{flex:1;overflow-y:auto;}
+.track-item{padding:6px 10px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;display:flex;align-items:center;gap:8px;}
+.track-item:hover{background:var(--panel2);}
+.track-item.selected{background:rgba(0,150,144,.08);border-left:2px solid var(--teal);}
+.track-num{font-size:9px;font-weight:700;color:var(--dim);width:16px;flex-shrink:0;}
+.track-name{flex:1;font-size:11px;font-weight:600;truncate;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.track-midi{font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(0,150,144,.15);color:var(--teal);font-weight:700;flex-shrink:0;}
+.track-audio{font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(123,47,212,.15);color:var(--purple);font-weight:700;flex-shrink:0;}
+.vol-bar{width:40px;height:4px;background:var(--border2);border-radius:2px;flex-shrink:0;}
+.vol-fill{height:100%;background:var(--teal);border-radius:2px;transition:width .2s;}
+
+/* Inspector */
+.inspector{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;}
+.inspector-body{flex:1;overflow-y:auto;padding:14px;}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--dim);gap:8px;}
+.empty-icon{font-size:32px;opacity:.3;}
+.section-title{font-size:9px;font-weight:800;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.track-detail-name{font-size:18px;font-weight:900;color:var(--text);margin-bottom:4px;}
+.track-detail-type{font-size:10px;color:var(--dim);margin-bottom:14px;}
+.vol-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.vol-label{font-size:9px;font-weight:700;color:var(--dim);width:40px;}
+.vol-slider{flex:1;-webkit-appearance:none;height:4px;background:var(--border2);border-radius:2px;outline:none;}
+.vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--teal);cursor:pointer;}
+.vol-val{font-size:10px;font-weight:700;color:var(--teal);width:36px;text-align:right;}
+.device-card{background:var(--panel2);border:1px solid var(--border2);border-radius:6px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;}
+.device-card:hover{border-color:var(--teal);}
+.device-card.open{border-color:var(--teal);}
+.device-name{font-size:11px;font-weight:700;margin-bottom:2px;}
+.device-class{font-size:9px;color:var(--dim);}
+.params-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;}
+.param-row{background:var(--panel);border-radius:4px;padding:6px 8px;}
+.param-name{font-size:9px;color:var(--dim);margin-bottom:3px;truncate;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.param-slider{width:100%;-webkit-appearance:none;height:3px;background:var(--border2);border-radius:2px;outline:none;margin-bottom:2px;}
+.param-slider::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:var(--purple);cursor:pointer;}
+.param-val{font-size:9px;color:var(--purple);font-weight:700;}
+
+/* AI Panel */
+.ai-panel{width:280px;display:flex;flex-direction:column;flex-shrink:0;}
+.mode-tabs{display:flex;border-bottom:1px solid var(--border);}
+.mode-tab{flex:1;padding:8px;text-align:center;font-size:9px;font-weight:800;letter-spacing:.15em;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;}
+.mode-tab.active{color:var(--teal);border-bottom-color:var(--teal);}
+.ai-body{flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;overflow:hidden;}
+.prompt-input{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;color:var(--text);font-size:11px;font-family:inherit;resize:none;height:60px;transition:border-color .15s;}
+.prompt-input:focus{outline:none;border-color:var(--teal);}
+.action-row{display:flex;gap:6px;}
+.action-btn{flex:1;padding:9px;border-radius:6px;border:none;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+.build-btn{background:var(--teal);color:#000;}
+.build-btn:hover{opacity:.85;}
+.explore-btn{background:var(--panel2);border:1px solid var(--border2);color:var(--text);}
+.explore-btn:hover{border-color:var(--purple);color:var(--purple);}
+.ai-status{font-size:10px;color:var(--dim);min-height:16px;}
+.ai-response{flex:1;overflow-y:auto;background:var(--panel2);border-radius:6px;padding:10px;font-size:11px;line-height:1.6;color:var(--text);white-space:pre-wrap;}
+
+/* Tools bar */
+.tools-bar{padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;background:var(--panel);}
+.tool-btn{padding:5px 10px;border-radius:4px;border:1px solid var(--border2);background:var(--panel2);color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.1em;cursor:pointer;transition:all .15s;text-transform:uppercase;}
+.tool-btn:hover{border-color:var(--teal);color:var(--teal);}
+
+/* Scrollbars */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* Toast */
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--teal);color:#000;padding:8px 16px;border-radius:6px;font-size:11px;font-weight:800;opacity:0;transition:opacity .2s;pointer-events:none;z-index:999;}
+.toast.show{opacity:1;}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100;}
+.modal-overlay.show{display:flex;}
+.modal{background:var(--panel);border:1px solid var(--border2);border-radius:10px;padding:20px;width:320px;display:flex;flex-direction:column;gap:12px;}
+.modal-title{font-size:13px;font-weight:900;letter-spacing:.1em;}
+.modal-input{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;font-family:inherit;}
+.modal-input:focus{outline:none;border-color:var(--teal);}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;}
+.modal-btn{padding:7px 16px;border-radius:5px;border:none;font-size:10px;font-weight:800;cursor:pointer;}
+.modal-cancel{background:var(--panel2);color:var(--dim);}
+.modal-ok{background:var(--teal);color:#000;}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="hdr">
+  <div class="brand">GAIN STUDIO</div>
+  <div class="sep"></div>
+  <div class="transport">
+    <button class="tbtn" id="play-btn" onclick="play()" title="Play">▶</button>
+    <button class="tbtn" id="stop-btn" onclick="stop()" title="Stop">■</button>
+  </div>
+  <div class="sep"></div>
+  <div class="tempo-box">
+    <label>BPM</label>
+    <input class="tempo-input" id="tempo" type="number" min="20" max="999" value="120" onchange="setTempo(this.value)">
+  </div>
+  <div class="sep"></div>
+  <div class="session-info">
+    <div class="stat">TRACKS <span id="track-count">—</span></div>
+    <div class="stat">TIME SIG <span id="time-sig">—</span></div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Track List -->
+  <div class="tracks-panel">
+    <div class="panel-hdr">
+      Tracks
+      <button class="add-btn" onclick="createTrack()" title="New MIDI Track">+</button>
+    </div>
+    <div class="track-list" id="track-list">
+      <div class="empty-state" style="height:80px;"><div class="stat">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- Inspector -->
+  <div class="inspector">
+    <div class="panel-hdr">Inspector</div>
+    <div class="inspector-body" id="inspector-body">
+      <div class="empty-state">
+        <div class="empty-icon">🎛</div>
+        <div class="stat">Select a track</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Panel -->
+  <div class="ai-panel">
+    <div class="mode-tabs">
+      <div class="mode-tab active" id="tab-build" onclick="setMode('BUILD')">Build</div>
+      <div class="mode-tab" id="tab-explore" onclick="setMode('EXPLORE')">Explore</div>
+    </div>
+    <div class="ai-body">
+      <textarea class="prompt-input" id="prompt" placeholder="Describe a sound or ask about your session..."></textarea>
+      <div class="action-row">
+        <button class="action-btn build-btn" id="build-btn" onclick="runBuild()">Build</button>
+        <button class="action-btn explore-btn" id="explore-btn" onclick="runExplore()">Explore</button>
+      </div>
+      <div class="ai-status" id="ai-status"></div>
+      <div class="ai-response" id="ai-response"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tools bar -->
+<div class="tools-bar">
+  <button class="tool-btn" onclick="showTempoModal()">Set Tempo</button>
+  <button class="tool-btn" onclick="createTrack()">+ MIDI Track</button>
+  <button class="tool-btn" onclick="loadSession()">Refresh</button>
+  <button class="tool-btn" onclick="showPlugins()">List Plugins</button>
+  <button class="tool-btn" onclick="showArrangement()">Arrangement</button>
+  <button class="tool-btn" onclick="showCuePoints()">Cue Points</button>
+  <button class="tool-btn" onclick="deleteSelectedTrack()">Delete Track</button>
+  <button class="tool-btn" onclick="window.open('http://127.0.0.1:5570','_blank')">Open Gain →</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Tempo Modal -->
+<div class="modal-overlay" id="tempo-modal">
+  <div class="modal">
+    <div class="modal-title">SET TEMPO</div>
+    <input class="modal-input" id="tempo-val" type="number" min="20" max="999" value="120" placeholder="BPM">
+    <div class="modal-btns">
+      <button class="modal-btn modal-cancel" onclick="closeModal('tempo-modal')">Cancel</button>
+      <button class="modal-btn modal-ok" onclick="applyTempo()">Set</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic Output Modal -->
+<div class="modal-overlay" id="output-modal">
+  <div class="modal" style="width:480px;max-height:70vh;">
+    <div class="modal-title" id="output-title">Output</div>
+    <pre id="output-body" style="font-size:10px;color:var(--dim);overflow-y:auto;max-height:400px;white-space:pre-wrap;"></pre>
+    <div class="modal-btns">
+      <button class="modal-btn modal-ok" onclick="closeModal('output-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedTrack = null;
+let currentMode = 'BUILD';
+let openDevices = {};
+
+// ── Session ──────────────────────────────────────────────────────────────────
+
+async function loadSession() {
+  try {
+    const r = await fetch('/api/session');
+    const d = await r.json();
+    const s = d.result || {};
+    document.getElementById('tempo').value = Math.round(s.tempo || 120);
+    document.getElementById('track-count').textContent = s.track_count || '—';
+    document.getElementById('time-sig').textContent = s.signature_numerator + '/' + s.signature_denominator || '—';
+    loadTracks();
+  } catch(e) { toast('Cannot reach Ableton', true); }
+}
+
+async function loadTracks() {
+  try {
+    const r = await fetch('/api/tracks');
+    const d = await r.json();
+    const tracks = d.tracks || [];
+    const list = document.getElementById('track-list');
+    list.innerHTML = '';
+    tracks.forEach((t, i) => {
+      const vol = t.volume || 0.85;
+      const volPct = Math.round((vol / 1.0) * 100);
+      const isMidi = t.is_midi_track;
+      const div = document.createElement('div');
+      div.className = 'track-item' + (selectedTrack === i ? ' selected' : '');
+      div.onclick = () => selectTrack(i, t);
+      div.innerHTML = \`
+        <span class="track-num">\${i+1}</span>
+        <span class="track-name" title="\${t.name || ''}">\${t.name || 'Track \${i+1}'}</span>
+        <span class="\${isMidi ? 'track-midi' : 'track-audio'}">\${isMidi ? 'M' : 'A'}</span>
+        <div class="vol-bar"><div class="vol-fill" style="width:\${volPct}%"></div></div>
+      \`;
+      list.appendChild(div);
+    });
+  } catch(e) {}
+}
+
+// ── Track Selection ───────────────────────────────────────────────────────────
+
+async function selectTrack(idx, trackData) {
+  selectedTrack = idx;
+  loadTracks();
+  const body = document.getElementById('inspector-body');
+  body.innerHTML = '<div class="empty-state"><div class="stat">Loading...</div></div>';
+
+  // Full track info
+  const r = await fetch(\`/api/track/\${idx}\`);
+  const d = await r.json();
+  const t = d.result || {};
+
+  const vol = t.volume || 0.85;
+  const pan = t.panning || 0;
+
+  let devHtml = '';
+  (t.devices || []).forEach((dev, di) => {
+    devHtml += \`
+      <div class="device-card" id="dev-\${di}" onclick="toggleDevice(\${idx}, \${di+1}, '\${(dev.name||'').replace(/'/g,"\\\\'")}')">
+        <div class="device-name">\${dev.name || 'Device ' + (di+1)}</div>
+        <div class="device-class">\${dev.class_name || ''}</div>
+        <div id="params-\${di}"></div>
+      </div>\`;
+  });
+  if (!devHtml) devHtml = '<div class="stat" style="color:var(--dim);margin-top:6px;">No devices</div>';
+
+  body.innerHTML = \`
+    <div class="track-detail-name">\${t.name || 'Track ' + (idx+1)}</div>
+    <div class="track-detail-type">\${t.is_midi_track ? 'MIDI Track' : 'Audio Track'} · Track \${idx+1}</div>
+    <div class="vol-row">
+      <span class="vol-label">VOL</span>
+      <input type="range" class="vol-slider" min="0" max="1" step="0.01" value="\${vol}"
+        oninput="updateVol(\${idx}, this.value)" onchange="setVol(\${idx}, this.value)">
+      <span class="vol-val" id="vol-val-\${idx}">\${Math.round(vol*100)}%</span>
+    </div>
+    <div class="vol-row">
+      <span class="vol-label">PAN</span>
+      <input type="range" class="vol-slider" min="-1" max="1" step="0.01" value="\${pan}"
+        onchange="setPan(\${idx}, this.value)">
+      <span class="vol-val">\${pan > 0 ? 'R' : pan < 0 ? 'L' : 'C'}</span>
+    </div>
+    <div class="section-title" style="margin-top:14px;">Devices</div>
+    \${devHtml}
+  \`;
+}
+
+function updateVol(idx, v) {
+  document.getElementById('vol-val-' + idx).textContent = Math.round(v*100) + '%';
+}
+
+async function setVol(idx, v) {
+  await fetch(\`/api/track/\${idx}/volume\`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({volume: parseFloat(v)})});
+  toast('Volume set');
+}
+
+async function setPan(idx, v) {
+  await fetch(\`/api/track/\${idx}/panning\`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({panning: parseFloat(v)})}).catch(()=>{});
+}
+
+async function toggleDevice(trackIdx, devIdx, name) {
+  const key = trackIdx + '-' + devIdx;
+  const card = document.getElementById('dev-' + (devIdx-1));
+  const paramsEl = document.getElementById('params-' + (devIdx-1));
+  if (openDevices[key]) {
+    openDevices[key] = false;
+    card.classList.remove('open');
+    paramsEl.innerHTML = '';
+    return;
+  }
+  openDevices[key] = true;
+  card.classList.add('open');
+  paramsEl.innerHTML = '<div class="stat" style="margin-top:8px;">Loading params...</div>';
+  const r = await fetch(\`/api/track/\${trackIdx}/device/\${devIdx}/params\`);
+  const d = await r.json();
+  const params = d.result?.parameters || [];
+  if (!params.length) { paramsEl.innerHTML = '<div class="stat" style="margin-top:8px;color:var(--dim);">No parameters</div>'; return; }
+  let html = '<div class="params-grid">';
+  params.slice(0,12).forEach((p, pi) => {
+    const norm = p.value != null ? ((p.value - (p.min||0)) / ((p.max||1) - (p.min||0))) : 0.5;
+    html += \`<div class="param-row">
+      <div class="param-name" title="\${p.name}">\${p.name}</div>
+      <input type="range" class="param-slider" min="0" max="1" step="0.001" value="\${norm}"
+        onchange="setParam(\${trackIdx},\${devIdx},'\${(p.name||'').replace(/'/g,"\\\\'")}',this.value,\${p.min||0},\${p.max||1})">
+      <div class="param-val">\${p.display_value || (p.value != null ? p.value.toFixed(2) : '—')}</div>
+    </div>\`;
+  });
+  html += '</div>';
+  paramsEl.innerHTML = html;
+}
+
+async function setParam(trackIdx, devIdx, name, normVal, min, max) {
+  const val = min + normVal * (max - min);
+  await fetch(\`/api/track/\${trackIdx}/device/\${devIdx}/param\`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, value: val})
+  });
+  toast('Parameter set');
+}
+
+// ── Transport ─────────────────────────────────────────────────────────────────
+
+async function play() {
+  await fetch('/api/playback/start', {method:'POST'});
+  document.getElementById('play-btn').classList.add('active');
+  document.getElementById('stop-btn').classList.remove('active');
+  toast('Playing');
+}
+
+async function stop() {
+  await fetch('/api/playback/stop', {method:'POST'});
+  document.getElementById('stop-btn').classList.add('active');
+  document.getElementById('play-btn').classList.remove('active');
+  toast('Stopped');
+}
+
+async function setTempo(bpm) {
+  await fetch('/api/tempo', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tempo: parseFloat(bpm)})});
+  toast('Tempo → ' + bpm + ' BPM');
+}
+
+// ── Track Actions ─────────────────────────────────────────────────────────────
+
+async function createTrack() {
+  const r = await fetch('/api/track/create', {method:'POST'});
+  toast('MIDI track created');
+  loadSession();
+}
+
+async function deleteSelectedTrack() {
+  if (selectedTrack === null) { toast('Select a track first', true); return; }
+  if (!confirm('Delete track ' + (selectedTrack+1) + '?')) return;
+  await fetch(\`/api/track/\${selectedTrack}/delete\`, {method:'POST'});
+  selectedTrack = null;
+  document.getElementById('inspector-body').innerHTML = '<div class="empty-state"><div class="empty-icon">🎛</div><div class="stat">Select a track</div></div>';
+  toast('Track deleted');
+  loadSession();
+}
+
+// ── AI Panel ──────────────────────────────────────────────────────────────────
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('tab-build').classList.toggle('active', mode==='BUILD');
+  document.getElementById('tab-explore').classList.toggle('active', mode==='EXPLORE');
+}
+
+async function runBuild() {
+  const p = document.getElementById('prompt').value.trim();
+  if (!p) return;
+  const btn = document.getElementById('build-btn');
+  btn.disabled = true;
+  document.getElementById('ai-status').textContent = 'Building...';
+  document.getElementById('ai-response').textContent = '';
+  try {
+    const r = await fetch('/ableton/build', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:p})});
+    const d = await r.json();
+    if (d.error) {
+      document.getElementById('ai-status').textContent = 'Error: ' + d.error;
+    } else {
+      document.getElementById('ai-status').textContent = d.steps.length + ' steps · ' + d.plan_tokens + ' tok';
+      document.getElementById('ai-response').textContent = 'Built: ' + d.track_name;
+      document.getElementById('prompt').value = '';
+      loadSession();
+    }
+  } catch(e) { document.getElementById('ai-status').textContent = 'Error: Gain not running'; }
+  btn.disabled = false;
+}
+
+async function runExplore() {
+  const p = document.getElementById('prompt').value.trim();
+  if (!p) return;
+  const btn = document.getElementById('explore-btn');
+  btn.disabled = true;
+  document.getElementById('ai-status').textContent = 'Asking Claude...';
+  document.getElementById('ai-response').textContent = '';
+  try {
+    const r = await fetch('/explore', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:p})});
+    const d = await r.json();
+    if (d.error) {
+      document.getElementById('ai-status').textContent = 'Error: ' + d.error;
+    } else {
+      document.getElementById('ai-status').textContent = d.tokens + ' tok';
+      document.getElementById('ai-response').textContent = d.text;
+      document.getElementById('prompt').value = '';
+    }
+  } catch(e) { document.getElementById('ai-status').textContent = 'Error'; }
+  btn.disabled = false;
+}
+
+document.getElementById('prompt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); currentMode === 'BUILD' ? runBuild() : runExplore(); }
+});
+
+// ── Tool Buttons ──────────────────────────────────────────────────────────────
+
+function showTempoModal() {
+  document.getElementById('tempo-val').value = document.getElementById('tempo').value;
+  document.getElementById('tempo-modal').classList.add('show');
+}
+
+async function applyTempo() {
+  const v = document.getElementById('tempo-val').value;
+  await setTempo(v);
+  document.getElementById('tempo').value = v;
+  closeModal('tempo-modal');
+}
+
+async function showPlugins() {
+  const r = await fetch('/api/plugins');
+  const d = await r.json();
+  const plugins = d.result?.plugins || [];
+  showOutput('External Plugins (' + plugins.length + ')', plugins.map(p => p.name || p).join('\\n') || 'None found');
+}
+
+async function showArrangement() {
+  const r = await fetch('/api/arrangement');
+  const d = await r.json();
+  showOutput('Arrangement', JSON.stringify(d.result || d, null, 2));
+}
+
+async function showCuePoints() {
+  const r = await fetch('/api/cue_points');
+  const d = await r.json();
+  const pts = d.result?.cue_points || [];
+  showOutput('Cue Points', pts.length ? pts.map(p => 'Bar ' + p.bar + ': ' + p.name).join('\\n') : 'No cue points');
+}
+
+function showOutput(title, body) {
+  document.getElementById('output-title').textContent = title;
+  document.getElementById('output-body').textContent = body;
+  document.getElementById('output-modal').classList.add('show');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+let toastTimer;
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.background = err ? 'var(--red)' : 'var(--teal)';
+  el.style.color = err ? '#fff' : '#000';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+loadSession();
+setInterval(loadSession, 5000);
+</script>
+</body>
+</html>"""
+
+@app.route("/dashboard")
+def dashboard():
+    return DASHBOARD_HTML
 
 # Always open clean — reset to neutral state on every server start
 write_state(DEFAULT_STATE.copy())
