@@ -5667,6 +5667,16 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .tool-btn{padding:5px 10px;border-radius:4px;border:1px solid var(--border2);background:var(--panel2);color:var(--dim);font-size:9px;font-weight:700;letter-spacing:.1em;cursor:pointer;transition:all .15s;text-transform:uppercase;}
 .tool-btn:hover{border-color:var(--teal);color:var(--teal);}
 
+/* Tools catalog */
+.tools-catalog{flex:1;overflow-y:auto;display:none;flex-direction:column;gap:0;}
+.tools-catalog.active{display:flex;}
+.tool-group{margin-bottom:0;}
+.tool-group-hdr{padding:7px 12px;font-size:9px;font-weight:900;letter-spacing:.2em;color:var(--teal);text-transform:uppercase;background:rgba(0,150,144,.06);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
+.tool-entry{padding:7px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:2px;cursor:default;transition:background .1s;}
+.tool-entry:hover{background:var(--panel2);}
+.tool-name{font-size:10px;font-weight:800;color:var(--text);font-family:'SF Mono',monospace;letter-spacing:-.01em;}
+.tool-desc{font-size:9px;color:var(--dim);line-height:1.4;}
+
 /* Scrollbars */
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -5741,6 +5751,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
     <div class="mode-tabs">
       <div class="mode-tab active" id="tab-build" onclick="setMode('BUILD')">Build</div>
       <div class="mode-tab" id="tab-explore" onclick="setMode('EXPLORE')">Explore</div>
+      <div class="mode-tab" id="tab-tools" onclick="setMode('TOOLS')">Tools</div>
     </div>
     <div class="ai-body">
       <textarea class="prompt-input" id="prompt" placeholder="Describe a sound or ask about your session..."></textarea>
@@ -5750,6 +5761,93 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
       </div>
       <div class="ai-status" id="ai-status"></div>
       <div class="ai-response" id="ai-response"></div>
+      <div class="tools-catalog" id="tools-catalog">
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Session &amp; Info</div>
+          <div class="tool-entry"><div class="tool-name">get_session_info</div><div class="tool-desc">Tempo, time sig, track count, playback state</div></div>
+          <div class="tool-entry"><div class="tool-name">get_track_info</div><div class="tool-desc">Name, type, armed, volume, devices, clips for one track</div></div>
+          <div class="tool-entry"><div class="tool-name">get_track_volume</div><div class="tool-desc">Current volume level of a track</div></div>
+          <div class="tool-entry"><div class="tool-name">get_arrangement_info</div><div class="tool-desc">All clips, length, and markers in arrangement view</div></div>
+          <div class="tool-entry"><div class="tool-name">get_cue_points</div><div class="tool-desc">All cue markers with names and bar positions</div></div>
+          <div class="tool-entry"><div class="tool-name">get_track_deletion_status</div><div class="tool-desc">Whether a pending track delete has completed</div></div>
+        </div>
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Tracks</div>
+          <div class="tool-entry"><div class="tool-name">create_midi_track</div><div class="tool-desc">Add a new MIDI track to the session</div></div>
+          <div class="tool-entry"><div class="tool-name">delete_track</div><div class="tool-desc">Remove a track by index</div></div>
+          <div class="tool-entry"><div class="tool-name">set_track_name</div><div class="tool-desc">Rename a track</div></div>
+          <div class="tool-entry"><div class="tool-name">set_track_volume</div><div class="tool-desc">Set volume level (0.0 – 1.0)</div></div>
+          <div class="tool-entry"><div class="tool-name">set_track_panning</div><div class="tool-desc">Set pan position (-1 left → 0 center → 1 right)</div></div>
+        </div>
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Clips</div>
+          <div class="tool-entry"><div class="tool-name">create_clip</div><div class="tool-desc">New empty MIDI clip in session view slot</div></div>
+          <div class="tool-entry"><div class="tool-name">fire_clip</div><div class="tool-desc">Launch a clip in session view</div></div>
+          <div class="tool-entry"><div class="tool-name">stop_clip</div><div class="tool-desc">Stop a playing clip</div></div>
+          <div class="tool-entry"><div class="tool-name">set_clip_name</div><div class="tool-desc">Rename a clip</div></div>
+          <div class="tool-entry"><div class="tool-name">add_notes_to_clip</div><div class="tool-desc">Write MIDI notes into an existing clip (pitch, time, duration, velocity)</div></div>
+          <div class="tool-entry"><div class="tool-name">manage_clip_automation</div><div class="tool-desc">Set automation envelope data inside a clip</div></div>
+          <div class="tool-entry"><div class="tool-name">duplicate_clip_to_arrangement</div><div class="tool-desc">Copy a session-view clip into the arrangement timeline</div></div>
+        </div>
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Arrangement</div>
+          <div class="tool-entry"><div class="tool-name">create_arrangement_midi_clip</div><div class="tool-desc">Place a MIDI clip at a specific timeline position and length</div></div>
+          <div class="tool-entry"><div class="tool-name">create_arrangement_audio_clip</div><div class="tool-desc">Place an audio clip at a specific timeline position</div></div>
+          <div class="tool-entry"><div class="tool-name">delete_arrangement_clip</div><div class="tool-desc">Remove a clip from the arrangement view</div></div>
+          <div class="tool-entry"><div class="tool-name">set_arrangement_clip_property</div><div class="tool-desc">Change loop, position, length, or warp settings on an arrangement clip</div></div>
+          <div class="tool-entry"><div class="tool-name">set_arrangement_loop</div><div class="tool-desc">Set the global loop start and end points</div></div>
+          <div class="tool-entry"><div class="tool-name">control_arrangement_view</div><div class="tool-desc">Scroll or zoom the arrangement timeline view</div></div>
+          <div class="tool-entry"><div class="tool-name">set_song_time</div><div class="tool-desc">Jump the playhead to a specific beat/bar position</div></div>
+        </div>
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Devices</div>
+          <div class="tool-entry"><div class="tool-name">get_device_parameters</div><div class="tool-desc">List all parameters (name, value, min, max) for a device</div></div>
+          <div class="tool-entry"><div class="tool-name">set_device_parameter</div><div class="tool-desc">Set a device parameter by name and value</div></div>
+          <div class="tool-entry"><div class="tool-name">delete_device</div><div class="tool-desc">Remove a device from a track's chain</div></div>
+          <div class="tool-entry"><div class="tool-name">enable_device</div><div class="tool-desc">Turn a device on</div></div>
+          <div class="tool-entry"><div class="tool-name">disable_device</div><div class="tool-desc">Turn a device off (bypass)</div></div>
+          <div class="tool-entry"><div class="tool-name">navigate_device_preset</div><div class="tool-desc">Cycle forward or backward through a device's presets</div></div>
+          <div class="tool-entry"><div class="tool-name">get_chain_info</div><div class="tool-desc">Devices and routing inside a rack chain</div></div>
+          <div class="tool-entry"><div class="tool-name">get_drum_pad_info</div><div class="tool-desc">Drum rack pad assignments, notes, and choke groups</div></div>
+        </div>
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Instruments &amp; Browser</div>
+          <div class="tool-entry"><div class="tool-name">load_instrument_or_effect</div><div class="tool-desc">Load any instrument or effect by its browser URI</div></div>
+          <div class="tool-entry"><div class="tool-name">load_external_plugin</div><div class="tool-desc">Load a specific VST/AU plugin by name</div></div>
+          <div class="tool-entry"><div class="tool-name">load_drum_kit</div><div class="tool-desc">Load a drum kit preset into a Drum Rack</div></div>
+          <div class="tool-entry"><div class="tool-name">list_external_plugins</div><div class="tool-desc">All installed VST/AU plugins Ableton can see</div></div>
+          <div class="tool-entry"><div class="tool-name">get_browser_tree</div><div class="tool-desc">Top-level Ableton library categories (Instruments, Samples, etc.)</div></div>
+          <div class="tool-entry"><div class="tool-name">get_browser_items_at_path</div><div class="tool-desc">Items inside a specific browser folder path</div></div>
+        </div>
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Transport &amp; View</div>
+          <div class="tool-entry"><div class="tool-name">start_playback</div><div class="tool-desc">Press Play</div></div>
+          <div class="tool-entry"><div class="tool-name">stop_playback</div><div class="tool-desc">Press Stop</div></div>
+          <div class="tool-entry"><div class="tool-name">set_tempo</div><div class="tool-desc">Change the session BPM</div></div>
+          <div class="tool-entry"><div class="tool-name">set_ableton_view</div><div class="tool-desc">Switch to Session, Arrangement, Detail, or Browser view</div></div>
+          <div class="tool-entry"><div class="tool-name">jump_to_cue_point</div><div class="tool-desc">Move playhead to a named cue marker</div></div>
+          <div class="tool-entry"><div class="tool-name">create_cue_point</div><div class="tool-desc">Add a cue marker at the current playhead position</div></div>
+          <div class="tool-entry"><div class="tool-name">delete_cue_point</div><div class="tool-desc">Remove a cue marker by name or index</div></div>
+        </div>
+
+        <div class="tool-group">
+          <div class="tool-group-hdr">Ableton Knowledge</div>
+          <div class="tool-entry"><div class="tool-name">search_live_manual</div><div class="tool-desc">Search the official Ableton Live manual</div></div>
+          <div class="tool-entry"><div class="tool-name">search_knowledge_base</div><div class="tool-desc">General Ableton tips and techniques database</div></div>
+          <div class="tool-entry"><div class="tool-name">search_transcripts</div><div class="tool-desc">Search tutorial video transcripts</div></div>
+          <div class="tool-entry"><div class="tool-name">search_videos</div><div class="tool-desc">Find relevant Ableton tutorial videos</div></div>
+          <div class="tool-entry"><div class="tool-name">search_push_manual</div><div class="tool-desc">Search the Push hardware manual</div></div>
+          <div class="tool-entry"><div class="tool-name">search_note_manual</div><div class="tool-desc">Search the Note app manual</div></div>
+        </div>
+
+      </div>
     </div>
   </div>
 </div>
@@ -5981,6 +6079,14 @@ function setMode(mode) {
   currentMode = mode;
   document.getElementById('tab-build').classList.toggle('active', mode==='BUILD');
   document.getElementById('tab-explore').classList.toggle('active', mode==='EXPLORE');
+  document.getElementById('tab-tools').classList.toggle('active', mode==='TOOLS');
+  // Show/hide panel sections
+  const isTools = mode === 'TOOLS';
+  document.getElementById('prompt').style.display = isTools ? 'none' : '';
+  document.querySelector('.action-row').style.display = isTools ? 'none' : '';
+  document.getElementById('ai-status').style.display = isTools ? 'none' : '';
+  document.getElementById('ai-response').style.display = isTools ? 'none' : '';
+  document.getElementById('tools-catalog').classList.toggle('active', isTools);
 }
 
 async function runBuild() {
