@@ -5149,11 +5149,8 @@ function armExplore(){
   document.getElementById('inp').focus();
 }
 async function doExplore(){
-  // First click arms it; if already armed and input has text, fires
-  const armed=document.getElementById('be').classList.contains('ae');
   const p=document.getElementById('inp').value.trim();
-  if(!armed){armExplore();return;}
-  if(!p){armExplore();return;}
+  if(!p){armExplore();return;}  // no text — arm and focus input
   document.getElementById('be').disabled=true;
   document.getElementById('resp').classList.remove('show');
   setSt('Reading session…');setTk(null);
