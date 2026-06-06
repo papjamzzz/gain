@@ -5650,7 +5650,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .mode-tabs{display:flex;border-bottom:1px solid var(--border);}
 .mode-tab{flex:1;padding:8px;text-align:center;font-size:9px;font-weight:800;letter-spacing:.15em;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;}
 .mode-tab.active{color:var(--teal);border-bottom-color:var(--teal);}
-.ai-body{flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;overflow:hidden;}
+.ai-body{flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;overflow:hidden;min-height:0;}
 .prompt-input{width:100%;background:var(--panel2);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;color:var(--text);font-size:11px;font-family:inherit;resize:none;height:60px;transition:border-color .15s;}
 .prompt-input:focus{outline:none;border-color:var(--teal);}
 .action-row{display:flex;gap:6px;}
@@ -5668,7 +5668,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-s
 .tool-btn:hover{border-color:var(--teal);color:var(--teal);}
 
 /* Tools catalog */
-.tools-catalog{flex:1;overflow-y:auto;display:none;flex-direction:column;gap:0;}
+.tools-catalog{flex:1;overflow-y:auto;display:none;flex-direction:column;gap:0;min-height:0;}
 .tools-catalog.active{display:flex;}
 .tool-group{margin-bottom:0;}
 .tool-group-hdr{padding:7px 12px;font-size:9px;font-weight:900;letter-spacing:.2em;color:var(--teal);text-transform:uppercase;background:rgba(0,150,144,.06);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
@@ -6080,13 +6080,29 @@ function setMode(mode) {
   document.getElementById('tab-build').classList.toggle('active', mode==='BUILD');
   document.getElementById('tab-explore').classList.toggle('active', mode==='EXPLORE');
   document.getElementById('tab-tools').classList.toggle('active', mode==='TOOLS');
-  // Show/hide panel sections
+
   const isTools = mode === 'TOOLS';
+  const isBuild = mode === 'BUILD';
+  const isExplore = mode === 'EXPLORE';
+
+  // Show/hide panel sections
   document.getElementById('prompt').style.display = isTools ? 'none' : '';
   document.querySelector('.action-row').style.display = isTools ? 'none' : '';
   document.getElementById('ai-status').style.display = isTools ? 'none' : '';
   document.getElementById('ai-response').style.display = isTools ? 'none' : '';
   document.getElementById('tools-catalog').classList.toggle('active', isTools);
+
+  // Visual feedback for Build vs Explore
+  if (!isTools) {
+    const buildBtn = document.getElementById('build-btn');
+    const exploreBtn = document.getElementById('explore-btn');
+    const prompt = document.getElementById('prompt');
+    buildBtn.style.opacity = isBuild ? '1' : '0.35';
+    exploreBtn.style.opacity = isExplore ? '1' : '0.35';
+    prompt.placeholder = isBuild
+      ? 'Describe a sound to build in Ableton...'
+      : 'Ask anything about your session or sound design...';
+  }
 }
 
 async function runBuild() {
