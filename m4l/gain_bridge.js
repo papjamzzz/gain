@@ -10,7 +10,7 @@ const http   = require("http");
 const GAIN_PORT = 5570;
 const GAIN_HOST = "127.0.0.1";
 
-function gainRequest(method, path, body) {
+function gainRequest(method, path, body, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : null;
     const options = {
@@ -31,7 +31,7 @@ function gainRequest(method, path, body) {
         catch (e) { resolve({ text: data }); }
       });
     });
-    req.setTimeout(3000, () => {
+    req.setTimeout(timeoutMs, () => {
       req.destroy(new Error("Gain server timeout — is Gain running on port 5570?"));
     });
     req.on("error", reject);
@@ -60,7 +60,7 @@ maxApi.addHandler("ask", async (...args) => {
   if (!prompt) return;
   maxApi.outlet("status", "thinking...");
   try {
-    const res = await gainRequest("POST", "/m4l/ask", { prompt });
+    const res = await gainRequest("POST", "/m4l/ask", { prompt }, 60000);
     if (res.error) {
       maxApi.outlet("status", "error: " + res.error);
     } else {
@@ -79,7 +79,7 @@ maxApi.addHandler("askpreset", async (...args) => {
   if (!prompt) return;
   maxApi.outlet("status", "thinking with preset: " + preset + "...");
   try {
-    const res = await gainRequest("POST", "/m4l/ask", { prompt, preset });
+    const res = await gainRequest("POST", "/m4l/ask", { prompt, preset }, 60000);
     if (res.error) {
       maxApi.outlet("status", "error: " + res.error);
     } else {
