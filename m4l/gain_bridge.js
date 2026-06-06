@@ -31,6 +31,9 @@ function gainRequest(method, path, body) {
         catch (e) { resolve({ text: data }); }
       });
     });
+    req.setTimeout(3000, () => {
+      req.destroy(new Error("Gain server timeout — is Gain running on port 5570?"));
+    });
     req.on("error", reject);
     if (payload) req.write(payload);
     req.end();
