@@ -4990,172 +4990,249 @@ _patchFetch();
 # ── Companion UI ──────────────────────────────────────────────────────────────
 
 COMPANION_HTML = """<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gain — Companion</title>
-<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<title>Gain</title>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:#030507;font-family:'Inter',sans-serif;color:#D8EAF8;width:380px;min-height:100vh;overflow-x:hidden;}
-::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-track{background:#060A0F;}::-webkit-scrollbar-thumb{background:#1E2E40;border-radius:2px;}
+html,body{width:280px;font-family:'Inter',sans-serif;overflow:hidden;transition:background .2s,color .2s;}
 
-.hdr{padding:12px 16px 10px;border-bottom:1px solid #162030;display:flex;align-items:center;gap:8px;background:#020406;position:sticky;top:0;z-index:10;}
-.hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,221,212,.4),transparent);}
-.brand{font-family:'Abril Fatface',serif;font-size:20px;background:linear-gradient(130deg,#00E8FF,#A0C8FF,#D946EF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-.status-dot{width:6px;height:6px;border-radius:50%;background:#34D399;box-shadow:0 0 6px #34D399;flex-shrink:0;}
-.status-dot.off{background:#405870;box-shadow:none;}
-.mode-tag{margin-left:auto;font-size:7px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;padding:2px 8px;border-radius:2px;border:1px solid rgba(0,221,212,.35);color:#00DDD4;background:rgba(0,221,212,.06);}
+[data-theme="dark"]{
+  --bg:#030507;--panel:#060A0F;--border:#0d1a24;--border2:#162030;
+  --text:#D8EAF8;--dim:#405870;--dim2:#1E3A50;--ftrack:#0A1018;
+  --t1:#00DDD4;--t2:#D946EF;--btn-bg:#060A0F;--btn-hover:#0A1018;
+  --resp-bg:#020406;--resp-text:#8AACC8;--foot-bg:transparent;
+}
+[data-theme="light"]{
+  --bg:#C8C8C8;--panel:#BABABA;--border:#A8A8A8;--border2:#989898;
+  --text:#1A1A1A;--dim:#606060;--dim2:#808080;--ftrack:#ACACAC;
+  --t1:#007A74;--t2:#9B1DB5;--btn-bg:#BABABA;--btn-hover:#ADADAD;
+  --resp-bg:#C0C0C0;--resp-text:#2A2A2A;--foot-bg:transparent;
+}
 
-.state-bar{display:flex;gap:0;border-bottom:1px solid #162030;}
-.state-ch{flex:1;padding:10px 12px;border-right:1px solid #162030;position:relative;overflow:hidden;}
-.state-ch:last-child{border-right:none;}
-.state-fill{position:absolute;bottom:0;left:0;right:0;opacity:.15;transition:height .3s ease;}
-.t1 .state-fill{background:#00DDD4;}
-.t2 .state-fill{background:#8B5CF6;}
-.t3 .state-fill{background:#D946EF;}
-.state-lbl{font-size:7px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:#405870;position:relative;}
-.state-val{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.02em;position:relative;}
-.t1 .state-val{color:#00DDD4;text-shadow:0 0 16px rgba(0,221,212,.3);}
-.t2 .state-val{color:#A78BFA;text-shadow:0 0 16px rgba(139,92,246,.3);}
-.t3 .state-val{color:#F0ABFF;text-shadow:0 0 16px rgba(217,70,239,.3);}
+html,body{background:var(--bg);color:var(--text);}
 
-.mode-btns{display:flex;gap:0;border-bottom:1px solid #162030;}
-.mode-btn{flex:1;height:36px;border:none;background:#060A0F;color:#405870;font-size:8px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;border-right:1px solid #162030;}
-.mode-btn:last-child{border-right:none;}
-.mode-btn:hover{color:#D8EAF8;}
-.mode-btn.active-build{background:rgba(0,221,212,.08);color:#00DDD4;}
-.mode-btn.active-explore{background:rgba(139,92,246,.08);color:#A78BFA;}
+.hdr{padding:8px 12px 6px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
+.brand{font-family:'Abril Fatface',serif;font-size:16px;background:linear-gradient(130deg,#00E8FF,#A0C8FF,#D946EF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;flex-shrink:0;}
+.dot{width:5px;height:5px;border-radius:50%;background:#34D399;box-shadow:0 0 5px #34D399;flex-shrink:0;}
+.dot.off{background:var(--dim2);box-shadow:none;}
+.theme-btn{margin-left:auto;width:22px;height:22px;border-radius:4px;border:1px solid var(--border2);background:var(--panel);color:var(--dim);font-size:9px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.theme-btn:hover{color:var(--text);border-color:var(--dim);}
 
-.ask-wrap{padding:12px 14px;border-bottom:1px solid #162030;}
-.ask-row{display:flex;gap:8px;margin-bottom:0;}
-.ask-input{flex:1;height:36px;background:#0A1018;border:1px solid #1E2E40;border-radius:4px;color:#D8EAF8;font-size:12px;font-family:'Inter',sans-serif;padding:0 12px;outline:none;transition:border-color .15s;}
-.ask-input:focus{border-color:#00DDD4;}
-.ask-btn{height:36px;padding:0 16px;border-radius:4px;border:1px solid rgba(0,221,212,.4);background:rgba(0,221,212,.08);color:#00DDD4;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;flex-shrink:0;}
-.ask-btn:hover{background:rgba(0,221,212,.18);}
-.ask-btn:disabled{opacity:.4;cursor:default;}
-.ask-status{font-size:9px;color:#405870;margin-top:6px;min-height:14px;letter-spacing:.04em;}
+.faders{display:flex;padding:14px 24px 10px;gap:32px;justify-content:center;border-bottom:1px solid var(--border);}
+.fc{display:flex;flex-direction:column;align-items:center;gap:7px;flex:1;}
+.flbl{font-size:7px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);}
+.fval{font-size:13px;font-weight:900;font-variant-numeric:tabular-nums;}
+.fval.t1{color:var(--t1);}.fval.t2{color:var(--t2);}
+.ftrack{width:20px;height:110px;background:var(--ftrack);border-radius:10px;position:relative;cursor:pointer;border:1px solid var(--border2);}
+.ffill{position:absolute;bottom:0;left:0;right:0;border-radius:10px;pointer-events:none;}
+.t1 .ffill{background:linear-gradient(to top,var(--t1),rgba(0,221,212,.15));}
+.t2 .ffill{background:linear-gradient(to top,var(--t2),rgba(217,70,239,.15));}
+.fthumb{position:absolute;left:50%;transform:translate(-50%,50%);width:32px;height:11px;background:var(--panel);border-radius:6px;cursor:grab;border:1px solid rgba(0,221,212,.3);box-shadow:0 0 8px rgba(0,221,212,.1);}
+.t2 .fthumb{border-color:rgba(217,70,239,.3);box-shadow:0 0 8px rgba(217,70,239,.1);}
+[data-theme="light"] .fthumb{border-color:rgba(0,122,116,.4);}
+[data-theme="light"] .t2 .fthumb{border-color:rgba(155,29,181,.4);}
 
-.response-wrap{padding:12px 14px;}
-.response-lbl{font-size:7px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:#405870;margin-bottom:8px;}
-.response-box{background:#060A0F;border:1px solid #162030;border-radius:4px;padding:12px;min-height:160px;max-height:320px;overflow-y:auto;font-size:12px;line-height:1.75;color:#A0BCD8;white-space:pre-wrap;font-family:'Inter',sans-serif;}
-.response-box.empty{color:#2A3A4A;font-style:italic;}
-.token-note{font-size:9px;color:#2A3A4A;margin-top:6px;text-align:right;}
+.btns{display:flex;border-bottom:1px solid var(--border);border-top:1px solid var(--border);}
+.bb{flex:1;height:44px;border:none;background:var(--btn-bg);font-size:9px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s;border-right:1px solid var(--border);color:var(--dim);}
+.bb:last-child{border-right:none;}
+.bb:hover{color:var(--text);background:var(--btn-hover);}
+.bb.ab{color:var(--t1);background:rgba(0,221,212,.07);box-shadow:inset 0 -3px 0 var(--t1);}
+.bb.ae{color:#A78BFA;background:rgba(139,92,246,.07);box-shadow:inset 0 -3px 0 #A78BFA;}
+[data-theme="light"] .bb.ab{background:rgba(0,122,116,.1);box-shadow:inset 0 -3px 0 var(--t1);}
+[data-theme="light"] .bb.ae{background:rgba(139,92,246,.1);}
+.bb:disabled{opacity:.4;cursor:default;}
+
+.inp-row{display:flex;border-bottom:1px solid var(--border);}
+.inp{flex:1;height:32px;background:transparent;border:none;color:var(--text);font-size:11px;font-family:'Inter',sans-serif;padding:0 10px;outline:none;}
+.inp::placeholder{color:var(--dim2);}
+
+.foot{display:flex;justify-content:space-between;align-items:center;padding:3px 10px;border-bottom:1px solid var(--border);min-height:20px;}
+.ft{font-size:8px;color:var(--dim);letter-spacing:.04em;}
+.tk{font-size:8px;font-weight:700;color:var(--dim2);}
+.tk.lit{color:var(--t1);}
+
+.resp{display:none;padding:10px 12px;font-size:11px;line-height:1.65;color:var(--resp-text);white-space:pre-wrap;max-height:240px;overflow-y:auto;background:var(--resp-bg);}
+.resp.show{display:block;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
 </style>
 </head>
 <body>
-
 <div class="hdr">
   <div class="brand">Gain</div>
-  <div class="status-dot off" id="dot"></div>
-  <div class="mode-tag" id="mode-tag">—</div>
+  <div class="dot off" id="dot"></div>
+  <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">D</button>
 </div>
 
-<div class="state-bar">
-  <div class="state-ch t1">
-    <div class="state-fill" id="fill-intensity"></div>
-    <div class="state-lbl">Intensity</div>
-    <div class="state-val" id="val-intensity">—</div>
+<div class="faders">
+  <div class="fc t1">
+    <div class="flbl">Effort</div>
+    <div class="ftrack" id="trk-intensity" onmousedown="drag(event,'intensity')">
+      <div class="ffill" id="fill-intensity"></div>
+      <div class="fthumb" id="thumb-intensity"></div>
+    </div>
+    <div class="fval t1" id="val-intensity">0.50</div>
   </div>
-  <div class="state-ch t2">
-    <div class="state-fill" id="fill-depth"></div>
-    <div class="state-lbl">Depth</div>
-    <div class="state-val" id="val-depth">—</div>
-  </div>
-  <div class="state-ch t3">
-    <div class="state-fill" id="fill-room"></div>
-    <div class="state-lbl">Verbosity</div>
-    <div class="state-val" id="val-room">—</div>
+  <div class="fc t2">
+    <div class="flbl">Verbosity</div>
+    <div class="ftrack" id="trk-room" onmousedown="drag(event,'room')">
+      <div class="ffill" id="fill-room"></div>
+      <div class="fthumb" id="thumb-room"></div>
+    </div>
+    <div class="fval t2" id="val-room">0.50</div>
   </div>
 </div>
 
-<div class="mode-btns">
-  <button class="mode-btn" id="btn-build"  onclick="setMode('BUILD')">Build</button>
-  <button class="mode-btn" id="btn-explore" onclick="setMode('EXPLORE')">Explore</button>
+<div class="btns">
+  <button class="bb" id="bb" onclick="doBuild()">Build</button>
+  <button class="bb" id="be" onclick="doExplore()">Explore</button>
 </div>
 
-<div class="ask-wrap">
-  <div class="ask-row">
-    <input class="ask-input" id="ask-input" type="text" placeholder="Ask Claude…" onkeydown="if(event.key==='Enter')ask()">
-    <button class="ask-btn" id="ask-btn" onclick="ask()">Ask</button>
-  </div>
-  <div class="ask-status" id="ask-status"></div>
+<div class="inp-row">
+  <input class="inp" id="inp" placeholder="Describe a sound or ask about the session…"
+    onkeydown="if(event.key==='Enter')submit()">
 </div>
 
-<div class="response-wrap">
-  <div class="response-lbl">Response</div>
-  <div class="response-box empty" id="response-box">Ask Claude anything. Same prompt, different state — different output.</div>
-  <div class="token-note" id="token-note"></div>
+<div class="foot">
+  <span class="ft" id="st"></span>
+  <span class="tk" id="tk">— tokens</span>
 </div>
+<div class="resp" id="resp"></div>
 
 <script>
-let currentState = {};
+let dragging=null;
+let theme=localStorage.getItem('gain-theme')||'dark';
+document.documentElement.setAttribute('data-theme',theme);
+document.getElementById('theme-btn').textContent=theme==='dark'?'L':'D';
 
-function applyState(s) {
-  currentState = s;
-  const fields = ['intensity','depth','room'];
-  fields.forEach(f => {
-    const v = s[f] != null ? s[f] : 0;
-    const valEl  = document.getElementById('val-' + f);
-    const fillEl = document.getElementById('fill-' + f);
-    if (valEl)  valEl.textContent  = v.toFixed(2);
-    if (fillEl) fillEl.style.height = (v * 100) + '%';
-  });
-  const mode = s.mode || '—';
-  document.getElementById('mode-tag').textContent = mode;
-  document.getElementById('btn-build').className  = 'mode-btn' + (mode === 'BUILD'   ? ' active-build'   : '');
-  document.getElementById('btn-explore').className = 'mode-btn' + (mode === 'EXPLORE' ? ' active-explore' : '');
-  document.getElementById('dot').className = 'status-dot';
+function toggleTheme(){
+  theme=theme==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',theme);
+  document.getElementById('theme-btn').textContent=theme==='dark'?'L':'D';
+  localStorage.setItem('gain-theme',theme);
 }
-
-async function setMode(mode) {
-  await fetch('/set', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mode})});
+function setFader(f,v){
+  document.getElementById('fill-'+f).style.height=(v*100)+'%';
+  document.getElementById('thumb-'+f).style.bottom='calc('+(v*100)+'% - 5.5px)';
+  document.getElementById('val-'+f).textContent=v.toFixed(2);
 }
-
-async function ask() {
-  const input  = document.getElementById('ask-input');
-  const btn    = document.getElementById('ask-btn');
-  const status = document.getElementById('ask-status');
-  const box    = document.getElementById('response-box');
-  const note   = document.getElementById('token-note');
-  const prompt = input.value.trim();
-  if (!prompt) return;
-  btn.disabled = true;
-  status.textContent = 'Thinking…';
-  box.className = 'response-box';
-  box.textContent = '';
-  note.textContent = '';
-  try {
-    const r = await fetch('/m4l/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({prompt})});
-    const d = await r.json();
-    if (d.error) { status.textContent = 'Error: ' + d.error; }
-    else {
-      box.textContent = d.text;
-      note.textContent = (d.tokens || 0) + ' tokens · ' + (currentState.mode || '') + ' mode';
-      status.textContent = '';
-      input.value = '';
-    }
-  } catch(e) { status.textContent = 'Error: Gain not running'; }
-  btn.disabled = false;
+function applyState(s){
+  setFader('intensity',s.intensity??0.5);
+  setFader('room',s.room??0.5);
+  document.getElementById('dot').className='dot';
 }
-
-// SSE — live state sync
-const es = new EventSource('/stream');
-es.onmessage = e => applyState(JSON.parse(e.data));
-es.onerror = () => { document.getElementById('dot').className = 'status-dot off'; };
-
-// Initial state
+function drag(e,f){
+  e.preventDefault();dragging=f;
+  document.onmousemove=function(ev){
+    const t=document.getElementById('trk-'+dragging);
+    const r=t.getBoundingClientRect();
+    let v=1-(ev.clientY-r.top)/r.height;
+    v=Math.max(0,Math.min(1,v));
+    setFader(dragging,v);
+    fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({[dragging]:v})});
+  };
+  document.onmouseup=function(){dragging=null;document.onmousemove=null;document.onmouseup=null;};
+}
+function doBuild(){
+  document.getElementById('bb').className='bb ab';
+  document.getElementById('be').className='bb';
+  document.getElementById('inp').focus();
+  submit();
+}
+function armExplore(){
+  document.getElementById('be').className='bb ae';
+  document.getElementById('bb').className='bb';
+  document.getElementById('inp').focus();
+}
+async function doExplore(){
+  // First click arms it; if already armed and input has text, fires
+  const armed=document.getElementById('be').classList.contains('ae');
+  const p=document.getElementById('inp').value.trim();
+  if(!armed){armExplore();return;}
+  if(!p){armExplore();return;}
+  document.getElementById('be').disabled=true;
+  document.getElementById('resp').classList.remove('show');
+  setSt('Reading session…');setTk(null);
+  await fetch('/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'EXPLORE'})});
+  try{
+    const r=await fetch('/explore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p})});
+    const d=await r.json();
+    if(d.error){setSt('Error: '+d.error);}
+    else{showResp(d.text);setSt('Explore');setTk(d.tokens);document.getElementById('inp').value='';}
+  }catch(e){setSt('Gain not running');}
+  document.getElementById('be').disabled=false;
+}
+async function submit(){
+  const p=document.getElementById('inp').value.trim();
+  if(!p)return;
+  const isExplore=document.getElementById('be').classList.contains('ae');
+  if(isExplore){doExplore();return;}
+  const isBuild=document.getElementById('bb').classList.contains('ab');
+  document.getElementById('resp').classList.remove('show');
+  setSt(isBuild?'Building — describe a sound (e.g. warm pad, punchy bass)…':'Thinking…');setTk(null);
+  if(isBuild){
+    let dot=0;const pulse=setInterval(()=>{dot=(dot+1)%4;setSt('Building'+'·'.repeat(dot+1));},600);
+    try{
+      const r=await fetch('/ableton/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p})});
+      clearInterval(pulse);
+      const d=await r.json();
+      if(d.error){setSt('Error: '+d.error);}
+      else{setSt('✓ Built: '+d.track_name);setTk(d.plan_tokens);document.getElementById('inp').value='';}
+    }catch(e){clearInterval(pulse);setSt('Error: Gain not running');}
+  }else{
+    try{
+      const r=await fetch('/m4l/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p})});
+      const d=await r.json();
+      if(d.error){setSt('Error: '+d.error);}
+      else{showResp(d.text);setSt('');setTk(d.tokens);document.getElementById('inp').value='';}
+    }catch(e){setSt('Gain not running');}
+  }
+}
+function showResp(t){const r=document.getElementById('resp');r.textContent=t;r.classList.add('show');}
+function setSt(t){document.getElementById('st').textContent=t;}
+function setTk(n){const e=document.getElementById('tk');e.textContent=n?n+' tokens':'— tokens';e.className='tk'+(n?' lit':'');}
+const es=new EventSource('/stream');
+es.onmessage=e=>applyState(JSON.parse(e.data));
+es.onerror=()=>{document.getElementById('dot').className='dot off';};
 fetch('/m4l/state').then(r=>r.json()).then(applyState).catch(()=>{});
 </script>
 </body>
 </html>"""
+
 
 # ── Max for Live bridge ────────────────────────────────────────────────────────
 
 @app.route("/m4l/state")
 def m4l_state():
     return jsonify(read_state())
+
+@app.route("/explore", methods=["POST"])
+def explore():
+    """Read Ableton session and answer a specific question about it."""
+    data   = request.get_json() or {}
+    prompt = data.get("prompt", "").strip()
+    if not prompt:
+        return jsonify({"error": "No prompt"}), 400
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not _anthropic or not api_key:
+        return jsonify({"error": "Claude not available"}), 500
+    state = read_state()
+    ctx   = _ableton_session_context()
+    try:
+        client = _anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model=_active_model, max_tokens=1024,
+            system=_build_prompt(state),
+            messages=[{"role": "user", "content":
+                f"[ABLETON SESSION]\n{ctx}\n\n[QUESTION]\n{prompt}"}],
+        )
+        return jsonify({"text": msg.content[0].text, "tokens": msg.usage.output_tokens})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/m4l/ask", methods=["POST"])
 def m4l_ask():
@@ -5168,12 +5245,17 @@ def m4l_ask():
     if not _anthropic or not api_key:
         return jsonify({"error": "Claude not available"}), 500
     state = _load_preset(preset) if preset else read_state()
+    # In EXPLORE mode, prepend live Ableton session context
+    user_content = prompt
+    if state.get("mode", "").upper() == "EXPLORE":
+        ctx = _ableton_session_context()
+        user_content = f"[ABLETON SESSION]\n{ctx}\n\n[QUESTION]\n{prompt}"
     try:
         client = _anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model=_active_model, max_tokens=1024,
             system=_build_prompt(state),
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": user_content}],
         )
         return jsonify({
             "text":   msg.content[0].text,
@@ -5191,6 +5273,187 @@ def _load_preset(name):
 def m4l_presets():
     names = [f.stem for f in PRESETS_DIR.glob("*.json")] if PRESETS_DIR.exists() else []
     return jsonify(names)
+
+# ── Ableton Builder ────────────────────────────────────────────────────────────
+
+import socket as _socket
+
+def _ableton_session_context():
+    """Pull session + track data from Ableton, capped at 2 seconds total."""
+    import threading
+    _result = {"ctx": ""}
+
+    def _fetch():
+        try:
+            session = _ableton_send("get_session_info")
+            result  = session.get("result", {})
+            tempo   = result.get("tempo", "?")
+            sig     = f"{result.get('signature_numerator',4)}/{result.get('signature_denominator',4)}"
+            count   = result.get("track_count", 0)
+            lines   = [f"SESSION: {tempo} BPM, {sig}, {count} tracks"]
+            for i in range(min(count, 12)):
+                t = _ableton_send("get_track_info", {"track_index": i}).get("result", {})
+                if not t:
+                    continue
+                kind  = "MIDI" if t.get("is_midi_track") else "Audio"
+                name  = t.get("name", f"Track {i+1}")
+                flags = ("".join([
+                    " [muted]" if t.get("mute") else "",
+                    " [solo]"  if t.get("solo") else "",
+                    " [armed]" if t.get("arm")  else "",
+                ]))
+                devs  = ", ".join(d["name"] for d in t.get("devices", []) if d.get("name"))
+                clips = [c["clip"]["name"] for c in t.get("clip_slots", [])
+                         if c.get("has_clip") and c.get("clip")]
+                dev_s  = f" | fx: {devs}"                         if devs  else ""
+                clip_s = f" | clips: {', '.join(set(clips))}"     if clips else ""
+                lines.append(f"  [{kind}] {name}{flags}{dev_s}{clip_s}")
+            _result["ctx"] = "\n".join(lines)
+        except Exception as e:
+            _result["ctx"] = f"(Could not read Ableton session: {e})"
+
+    t = threading.Thread(target=_fetch, daemon=True)
+    t.start()
+    t.join(timeout=2.0)
+    return _result["ctx"] or "(Ableton session context timed out)"
+
+def _ableton_send(command_type, params=None):
+    """Send a command to Ableton via TCP socket on localhost:9877."""
+    try:
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+        s.settimeout(10)
+        s.connect(("localhost", 9877))
+        msg = json.dumps({"type": command_type, "params": params or {}}).encode("utf-8")
+        s.sendall(msg)
+        import time; time.sleep(0.1)
+        chunks = []
+        s.settimeout(1)
+        try:
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+        except _socket.timeout:
+            pass
+        s.close()
+        raw = b"".join(chunks)
+        return json.loads(raw) if raw else {"ok": True}
+    except Exception as e:
+        return {"error": str(e)}
+
+_ABLETON_BUILD_SYSTEM = """You are an Ableton Live sound designer. The user describes a sound they want built as a new playable MIDI instrument track.
+You ALWAYS create a new MIDI track with one instrument and 1-3 effects. Never build master bus chains. Always build playable instruments.
+You respond with a JSON build plan — no markdown, no explanation, just valid JSON.
+
+Available commands:
+- create_midi_track: params: {}  (creates at end, returns track index in result.track_index, 1-based)
+- set_track_name: params: {track_index, name}
+- load_browser_item: params: {track_index, item_uri}  (loads instrument or effect)
+
+URI catalog (use these exactly):
+INSTRUMENTS:
+  Shimmer Pad (Wavetable):       query:Synths#Wavetable:Pad:FileId_22940
+  Voicelike Pad (Wavetable):     query:Synths#Wavetable:Pad:FileId_7056
+  Drifting Ambient Pad:          query:Synths#Wavetable:Ambient%20&%20Evolving:FileId_8424
+  Spacey Ambient Pad:            query:Synths#Wavetable:Ambient%20&%20Evolving:FileId_8434
+  Choiriffic (vocal pad):        query:Synths#Wavetable:Ambient%20&%20Evolving:FileId_7151
+  Vapor Chimes Pad:              query:Synths#Wavetable:Pad:FileId_7051
+  Stars Pad:                     query:Synths#Wavetable:Pad:FileId_7037
+  Bell Pad:                      query:Synths#Wavetable:Pad:FileId_6967
+  Chord Eno Pad:                 query:Synths#Wavetable:Pad:FileId_6977
+  Analog Soft Pad:               query:Synths#Wavetable:Pad:FileId_8190
+  Spectral Movement Pad:         query:Synths#Wavetable:Pad:FileId_7036
+  Dark Swell Pad:                query:Synths#Wavetable:Pad:FileId_6987
+  Detuned Square Pad:            query:Synths#Wavetable:Pad:FileId_6989
+  Super Bloom Pad:               query:Synths#Wavetable:Pad:FileId_7041
+  Sunrise Waves (ambient):       query:Synths#Wavetable:Ambient%20&%20Evolving:FileId_7167
+  Operator (FM synth):           query:Synths#Operator
+  Analog (subtractive):          query:Synths#Analog
+  Wavetable (blank):             query:Synths#Wavetable
+
+REVERB:
+  Long Tail (large, washy):      query:AudioFx#Reverb:Hall:FileId_9600
+  Cathedral:                     query:AudioFx#Reverb:Hall:FileId_9588
+  Spacious:                      query:AudioFx#Reverb:Hall:FileId_9606
+  Hall Shine:                    query:AudioFx#Reverb:Hall:FileId_9595
+  Vocal Hall:                    query:AudioFx#Reverb:Hall:FileId_9607
+  Dark Hall:                     query:AudioFx#Reverb:Hall:FileId_9591
+
+CHORUS / WIDTH:
+  Warm Ensemble:                 query:AudioFx#Chorus-Ensemble:FileId_10186
+  Ensemble Deep:                 query:AudioFx#Chorus-Ensemble:FileId_10178
+  Chorus Classic:                query:AudioFx#Chorus-Ensemble:FileId_10176
+  Vibrato Spacial:               query:AudioFx#Chorus-Ensemble:FileId_10182
+
+DELAY:
+  Simple Delay (base):           query:AudioFx#Simple%20Delay
+  Ping Pong Delay:               query:AudioFx#Ping%20Pong%20Delay
+
+FILTER / DYNAMICS:
+  Auto Filter:                   query:AudioFx#Auto%20Filter
+  Compressor:                    query:AudioFx#Compressor
+  EQ Eight:                      query:AudioFx#EQ%20Eight
+
+Output format — return ONLY this JSON, nothing else:
+{
+  "track_name": "descriptive name",
+  "steps": [
+    {"type": "create_midi_track", "params": {}},
+    {"type": "set_track_name", "params": {"track_index": "__NEW__", "name": "track_name"}},
+    {"type": "load_browser_item", "params": {"track_index": "__NEW__", "item_uri": "..."}},
+    {"type": "load_browser_item", "params": {"track_index": "__NEW__", "item_uri": "..."}}
+  ]
+}
+
+Use __NEW__ as the track_index placeholder — it will be replaced with the real index after creation.
+Choose 1 instrument + 1-3 effects that together achieve the described sound."""
+
+@app.route("/ableton/build", methods=["POST"])
+def ableton_build():
+    data   = request.get_json() or {}
+    prompt = data.get("prompt", "").strip()
+    if not prompt:
+        return jsonify({"error": "No prompt"}), 400
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not _anthropic or not api_key:
+        return jsonify({"error": "Claude not available"}), 500
+    try:
+        client = _anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model=_active_model, max_tokens=1024,
+            system=_ABLETON_BUILD_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text.strip()
+        plan = json.loads(raw)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Claude returned invalid JSON", "raw": raw}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    # Execute the plan against Ableton
+    track_index = None
+    results = []
+    for step in plan.get("steps", []):
+        cmd   = step["type"]
+        params = dict(step.get("params", {}))
+        # Substitute __NEW__ with the real track index
+        params = {k: (track_index if v == "__NEW__" else v) for k, v in params.items()}
+        result = _ableton_send(cmd, params)
+        if cmd == "create_midi_track":
+            ti = result.get("result", {}).get("index")
+            if ti is not None:
+                track_index = ti  # socket uses 0-based indices
+        results.append({"cmd": cmd, "result": result})
+
+    return jsonify({
+        "ok": True,
+        "track_name": plan.get("track_name", ""),
+        "track_index": track_index,
+        "steps": results,
+        "plan_tokens": msg.usage.output_tokens,
+    })
 
 # Always open clean — reset to neutral state on every server start
 write_state(DEFAULT_STATE.copy())
