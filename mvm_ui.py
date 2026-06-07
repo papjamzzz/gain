@@ -5288,43 +5288,37 @@ def m4l_presets():
 import socket as _socket
 
 def _ableton_session_context():
-    """Pull session + track data from Ableton, capped at 2 seconds total."""
-    import threading
-    _result = {"ctx": ""}
-
-    def _fetch():
-        try:
-            session = _ableton_send("get_session_info")
-            result  = session.get("result", {})
-            tempo   = result.get("tempo", "?")
-            sig     = f"{result.get('signature_numerator',4)}/{result.get('signature_denominator',4)}"
-            count   = result.get("track_count", 0)
-            lines   = [f"SESSION: {tempo} BPM, {sig}, {count} tracks"]
-            for i in range(min(count, 12)):
+    """Pull session + track data from Ableton sequentially, fast."""
+    try:
+        session = _ableton_send("get_session_info")
+        result  = session.get("result", {})
+        tempo   = result.get("tempo", "?")
+        sig     = f"{result.get('signature_numerator',4)}/{result.get('signature_denominator',4)}"
+        count   = result.get("track_count", 0)
+        lines   = [f"SESSION: {tempo} BPM, {sig}, {count} tracks"]
+        for i in range(min(count, 16)):
+            try:
                 t = _ableton_send("get_track_info", {"track_index": i}).get("result", {})
                 if not t:
                     continue
-                kind  = "MIDI" if t.get("is_midi_track") else "Audio"
-                name  = t.get("name", f"Track {i+1}")
-                flags = ("".join([
+                kind   = "MIDI" if t.get("is_midi_track") else "Audio"
+                name   = t.get("name", f"Track {i+1}")
+                flags  = "".join([
                     " [muted]" if t.get("mute") else "",
                     " [solo]"  if t.get("solo") else "",
                     " [armed]" if t.get("arm")  else "",
-                ]))
-                devs  = ", ".join(d["name"] for d in t.get("devices", []) if d.get("name"))
-                clips = [c["clip"]["name"] for c in t.get("clip_slots", [])
-                         if c.get("has_clip") and c.get("clip")]
-                dev_s  = f" | fx: {devs}"                         if devs  else ""
-                clip_s = f" | clips: {', '.join(set(clips))}"     if clips else ""
+                ])
+                devs   = ", ".join(d["name"] for d in t.get("devices", []) if d.get("name"))
+                clips  = [c["clip"]["name"] for c in t.get("clip_slots", [])
+                          if c.get("has_clip") and c.get("clip")]
+                dev_s  = f" | fx: {devs}"                     if devs  else ""
+                clip_s = f" | clips: {', '.join(set(clips))}" if clips else ""
                 lines.append(f"  [{kind}] {name}{flags}{dev_s}{clip_s}")
-            _result["ctx"] = "\n".join(lines)
-        except Exception as e:
-            _result["ctx"] = f"(Could not read Ableton session: {e})"
-
-    t = threading.Thread(target=_fetch, daemon=True)
-    t.start()
-    t.join(timeout=8.0)
-    return _result["ctx"] or "(Ableton session context timed out)"
+            except Exception:
+                continue
+        return "\n".join(lines)
+    except Exception as e:
+        return f"(Could not read Ableton session: {e})"
 
 def _ableton_send(command_type, params=None):
     """Send a command to Ableton via TCP socket on localhost:9877."""
@@ -5334,7 +5328,7 @@ def _ableton_send(command_type, params=None):
         s.connect(("localhost", 9877))
         msg = json.dumps({"type": command_type, "params": params or {}}).encode("utf-8")
         s.sendall(msg)
-        import time; time.sleep(0.1)
+        import time; time.sleep(0.02)
         chunks = []
         s.settimeout(1)
         try:
