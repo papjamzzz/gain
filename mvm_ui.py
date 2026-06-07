@@ -5256,11 +5256,9 @@ def m4l_ask():
     if not _anthropic or not api_key:
         return jsonify({"error": "Claude not available"}), 500
     state = _load_preset(preset) if preset else read_state()
-    # In EXPLORE mode, prepend live Ableton session context
-    user_content = prompt
-    if state.get("mode", "").upper() == "EXPLORE":
-        ctx = _ableton_session_context()
-        user_content = f"[ABLETON SESSION]\n{ctx}\n\n[QUESTION]\n{prompt}"
+    # Always prepend live Ableton session context for /m4l/ask
+    ctx = _ableton_session_context()
+    user_content = f"[ABLETON SESSION]\n{ctx}\n\n[QUESTION]\n{prompt}"
     try:
         client = _anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
@@ -5325,7 +5323,7 @@ def _ableton_session_context():
 
     t = threading.Thread(target=_fetch, daemon=True)
     t.start()
-    t.join(timeout=2.0)
+    t.join(timeout=8.0)
     return _result["ctx"] or "(Ableton session context timed out)"
 
 def _ableton_send(command_type, params=None):
