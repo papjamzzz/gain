@@ -5923,12 +5923,12 @@ async function loadTracks() {
       const div = document.createElement('div');
       div.className = 'track-item' + (selectedTrack === i ? ' selected' : '');
       div.onclick = () => selectTrack(i, t);
-      div.innerHTML = \`
-        <span class="track-num">\${i+1}</span>
-        <span class="track-name" title="\${t.name || ''}">\${t.name || 'Track \${i+1}'}</span>
-        <span class="\${isMidi ? 'track-midi' : 'track-audio'}">\${isMidi ? 'M' : 'A'}</span>
-        <div class="vol-bar"><div class="vol-fill" style="width:\${volPct}%"></div></div>
-      \`;
+      div.innerHTML = `
+        <span class="track-num">${i+1}</span>
+        <span class="track-name" title="${t.name || ''}">${t.name || 'Track ${i+1}'}</span>
+        <span class="${isMidi ? 'track-midi' : 'track-audio'}">${isMidi ? 'M' : 'A'}</span>
+        <div class="vol-bar"><div class="vol-fill" style="width:${volPct}%"></div></div>
+      `;
       list.appendChild(div);
     });
   } catch(e) {}
@@ -5943,7 +5943,7 @@ async function selectTrack(idx, trackData) {
   body.innerHTML = '<div class="empty-state"><div class="stat">Loading...</div></div>';
 
   // Full track info
-  const r = await fetch(\`/api/track/\${idx}\`);
+  const r = await fetch(`/api/track/${idx}`);
   const d = await r.json();
   const t = d.result || {};
 
@@ -5952,33 +5952,33 @@ async function selectTrack(idx, trackData) {
 
   let devHtml = '';
   (t.devices || []).forEach((dev, di) => {
-    devHtml += \`
-      <div class="device-card" id="dev-\${di}" onclick="toggleDevice(\${idx}, \${di+1}, '\${(dev.name||'').replace(/'/g,"\\\\'")}')">
-        <div class="device-name">\${dev.name || 'Device ' + (di+1)}</div>
-        <div class="device-class">\${dev.class_name || ''}</div>
-        <div id="params-\${di}"></div>
-      </div>\`;
+    devHtml += `
+      <div class="device-card" id="dev-${di}" onclick="toggleDevice(${idx}, ${di+1}, '${(dev.name||'').replace(/'/g,"\\\\'")}')">
+        <div class="device-name">${dev.name || 'Device ' + (di+1)}</div>
+        <div class="device-class">${dev.class_name || ''}</div>
+        <div id="params-${di}"></div>
+      </div>`;
   });
   if (!devHtml) devHtml = '<div class="stat" style="color:var(--dim);margin-top:6px;">No devices</div>';
 
-  body.innerHTML = \`
-    <div class="track-detail-name">\${t.name || 'Track ' + (idx+1)}</div>
-    <div class="track-detail-type">\${t.is_midi_track ? 'MIDI Track' : 'Audio Track'} · Track \${idx+1}</div>
+  body.innerHTML = `
+    <div class="track-detail-name">${t.name || 'Track ' + (idx+1)}</div>
+    <div class="track-detail-type">${t.is_midi_track ? 'MIDI Track' : 'Audio Track'} · Track ${idx+1}</div>
     <div class="vol-row">
       <span class="vol-label">VOL</span>
-      <input type="range" class="vol-slider" min="0" max="1" step="0.01" value="\${vol}"
-        oninput="updateVol(\${idx}, this.value)" onchange="setVol(\${idx}, this.value)">
-      <span class="vol-val" id="vol-val-\${idx}">\${Math.round(vol*100)}%</span>
+      <input type="range" class="vol-slider" min="0" max="1" step="0.01" value="${vol}"
+        oninput="updateVol(${idx}, this.value)" onchange="setVol(${idx}, this.value)">
+      <span class="vol-val" id="vol-val-${idx}">${Math.round(vol*100)}%</span>
     </div>
     <div class="vol-row">
       <span class="vol-label">PAN</span>
-      <input type="range" class="vol-slider" min="-1" max="1" step="0.01" value="\${pan}"
-        onchange="setPan(\${idx}, this.value)">
-      <span class="vol-val">\${pan > 0 ? 'R' : pan < 0 ? 'L' : 'C'}</span>
+      <input type="range" class="vol-slider" min="-1" max="1" step="0.01" value="${pan}"
+        onchange="setPan(${idx}, this.value)">
+      <span class="vol-val">${pan > 0 ? 'R' : pan < 0 ? 'L' : 'C'}</span>
     </div>
     <div class="section-title" style="margin-top:14px;">Devices</div>
-    \${devHtml}
-  \`;
+    ${devHtml}
+  `;
 }
 
 function updateVol(idx, v) {
@@ -5986,12 +5986,12 @@ function updateVol(idx, v) {
 }
 
 async function setVol(idx, v) {
-  await fetch(\`/api/track/\${idx}/volume\`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({volume: parseFloat(v)})});
+  await fetch(`/api/track/${idx}/volume`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({volume: parseFloat(v)})});
   toast('Volume set');
 }
 
 async function setPan(idx, v) {
-  await fetch(\`/api/track/\${idx}/panning\`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({panning: parseFloat(v)})}).catch(()=>{});
+  await fetch(`/api/track/${idx}/panning`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({panning: parseFloat(v)})}).catch(()=>{});
 }
 
 async function toggleDevice(trackIdx, devIdx, name) {
@@ -6007,19 +6007,19 @@ async function toggleDevice(trackIdx, devIdx, name) {
   openDevices[key] = true;
   card.classList.add('open');
   paramsEl.innerHTML = '<div class="stat" style="margin-top:8px;">Loading params...</div>';
-  const r = await fetch(\`/api/track/\${trackIdx}/device/\${devIdx}/params\`);
+  const r = await fetch(`/api/track/${trackIdx}/device/${devIdx}/params`);
   const d = await r.json();
   const params = d.result?.parameters || [];
   if (!params.length) { paramsEl.innerHTML = '<div class="stat" style="margin-top:8px;color:var(--dim);">No parameters</div>'; return; }
   let html = '<div class="params-grid">';
   params.slice(0,12).forEach((p, pi) => {
     const norm = p.value != null ? ((p.value - (p.min||0)) / ((p.max||1) - (p.min||0))) : 0.5;
-    html += \`<div class="param-row">
-      <div class="param-name" title="\${p.name}">\${p.name}</div>
-      <input type="range" class="param-slider" min="0" max="1" step="0.001" value="\${norm}"
-        onchange="setParam(\${trackIdx},\${devIdx},'\${(p.name||'').replace(/'/g,"\\\\'")}',this.value,\${p.min||0},\${p.max||1})">
-      <div class="param-val">\${p.display_value || (p.value != null ? p.value.toFixed(2) : '—')}</div>
-    </div>\`;
+    html += `<div class="param-row">
+      <div class="param-name" title="${p.name}">${p.name}</div>
+      <input type="range" class="param-slider" min="0" max="1" step="0.001" value="${norm}"
+        onchange="setParam(${trackIdx},${devIdx},'${(p.name||'').replace(/'/g,"\\\\'")}',this.value,${p.min||0},${p.max||1})">
+      <div class="param-val">${p.display_value || (p.value != null ? p.value.toFixed(2) : '—')}</div>
+    </div>`;
   });
   html += '</div>';
   paramsEl.innerHTML = html;
@@ -6027,7 +6027,7 @@ async function toggleDevice(trackIdx, devIdx, name) {
 
 async function setParam(trackIdx, devIdx, name, normVal, min, max) {
   const val = min + normVal * (max - min);
-  await fetch(\`/api/track/\${trackIdx}/device/\${devIdx}/param\`, {
+  await fetch(`/api/track/${trackIdx}/device/${devIdx}/param`, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({name, value: val})
   });
@@ -6066,7 +6066,7 @@ async function createTrack() {
 async function deleteSelectedTrack() {
   if (selectedTrack === null) { toast('Select a track first', true); return; }
   if (!confirm('Delete track ' + (selectedTrack+1) + '?')) return;
-  await fetch(\`/api/track/\${selectedTrack}/delete\`, {method:'POST'});
+  await fetch(`/api/track/${selectedTrack}/delete`, {method:'POST'});
   selectedTrack = null;
   document.getElementById('inspector-body').innerHTML = '<div class="empty-state"><div class="empty-icon">🎛</div><div class="stat">Select a track</div></div>';
   toast('Track deleted');
